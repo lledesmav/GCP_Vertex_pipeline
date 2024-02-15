@@ -1,0 +1,30 @@
+{
+    "BATCH_PREDICTION":{
+        "DEPLOY_COMPUTE":"n1-standard-16",
+        "START_REPLICA":5,
+        "MAX_REPLICA":5,
+        "SAMPLE_RATE":0.8,
+        
+        "SKEW_THRESHOLDS":{"sepal_length_cm" : 0.3, 
+                           "sepal_width_cm"  : 0.3,
+                           "petal_length_cm" : 0.3, 
+                           "petal_width_cm"  : 0.3},
+        
+        "ATTRIBUTION_SCORE_SKEW_THRESHOLDS":{"sepal_length_cm" : 0.3, 
+                                             "sepal_width_cm"  : 0.3,
+                                             "petal_length_cm" : 0.3, 
+                                             "petal_width_cm"  : 0.3},
+           
+        "DRIFT_THRESHOLDS":{"sepal_length_cm" : 0.3, 
+                            "sepal_width_cm"  : 0.3,
+                            "petal_length_cm" : 0.3, 
+                            "petal_width_cm"  : 0.3},
+        
+        "ATTRIBUTION_SCORE_DRIFT_THRESHOLDS":{"sepal_length_cm" : 0.3, 
+                                              "sepal_width_cm"  : 0.3,
+                                              "petal_length_cm" : 0.3, 
+                                              "petal_width_cm"  : 0.3},
+        
+        "ALERT_MAILS":["joseenrique.mejia@ferreycorp.com.pe"]
+    }
+}

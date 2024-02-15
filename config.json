@@ -1,0 +1,26 @@
+{
+    "PROJECT_KEY_PATH"             : "key/credentials.json",
+    
+    "PIPELINE_PROJECT_ID"          : "astral-reef-391421",
+    "PIPELINE_REGION"              : "us-central1",
+    "PIPELINE_METADATA"            : {"key":"mlops",
+                                      "value":"mle-template"},
+    
+    "PIPELINE_NAME_BUCKET"         : "my-bucket-dmc",
+    "PIPELINE_PATH_BUCKET"         : "mlops-test",
+    "PIPELINE_MODEL_NAMES"         : "iris-model",
+    "PIPELINE_MODEL_DESCRIPTION"   : "Modelo plantilla MLOps",
+    
+    "OUTPUT_PROJECT_ID"            : "astral-reef-391421",
+    "OUTPUT_DATASET_ID"            : "Mlops",
+    "OUTPUT_TABLE_ID"              : "MlopsTemplate",
+    
+    "OUTPUT_SCHEMA"                : {"field_name": ["sepal_length_cm", "sepal_width_cm", "petal_length_cm", "petal_width_cm", "predictions"],
+                                      "type": ["FLOAT", "FLOAT", "FLOAT", "FLOAT", "FLOAT"],
+                                      "mode": ["NULLABLE", "NULLABLE", "NULLABLE", "NULLABLE", "NULLABLE"],
+                                      "description": ["This is sepal_length_cm column", 
+                                                      "This is sepal_width_cm column",
+                                                      "This is petal_length_cm column",
+                                                      "This is petal_width_cm column",
+                                                      "This is predictions column"]}
+}

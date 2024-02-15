@@ -1,0 +1,695 @@
+# PIPELINE DEFINITION
+# Name: mlops-mle-template
+# Inputs:
+#    credential_path: str
+#    labels: dict
+#    location: str
+#    model_description: str
+#    model_name: str
+#    name_bucket: str
+#    path_bucket: str
+#    project: str
+# Outputs:
+#    testing-model-metrics: system.Metrics
+#    train-model-metrics: system.Metrics
+components:
+  comp-condition-1:
+    dag:
+      tasks:
+        create-custom-predict:
+          cachingOptions:
+            enableCache: true
+          componentRef:
+            name: comp-create-custom-predict
+          inputs:
+            parameters:
+              credential_path:
+                componentInputParameter: pipelinechannel--credential_path
+              labels:
+                componentInputParameter: pipelinechannel--labels
+              location:
+                componentInputParameter: pipelinechannel--location
+              name_bucket:
+                componentInputParameter: pipelinechannel--name_bucket
+              project:
+                componentInputParameter: pipelinechannel--project
+          taskInfo:
+            name: Create Custom Predict Image
+        upload-to-model-registry:
+          cachingOptions:
+            enableCache: true
+          componentRef:
+            name: comp-upload-to-model-registry
+          dependentTasks:
+          - create-custom-predict
+          inputs:
+            artifacts:
+              input_model:
+                componentInputArtifact: pipelinechannel--train-model-model
+            parameters:
+              credential_path:
+                componentInputParameter: pipelinechannel--credential_path
+              description:
+                componentInputParameter: pipelinechannel--model_description
+              labels:
+                componentInputParameter: pipelinechannel--labels
+              location:
+                componentInputParameter: pipelinechannel--location
+              model_name:
+                componentInputParameter: pipelinechannel--model_name
+              project:
+                componentInputParameter: pipelinechannel--project
+              serving_container_image_uri:
+                taskOutputParameter:
+                  outputParameterKey: Output
+                  producerTask: create-custom-predict
+          taskInfo:
+            name: Save Model
+    inputDefinitions:
+      artifacts:
+        pipelinechannel--train-model-model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+      parameters:
+        pipelinechannel--credential_path:
+          parameterType: STRING
+        pipelinechannel--labels:
+          parameterType: STRUCT
+        pipelinechannel--location:
+          parameterType: STRING
+        pipelinechannel--model_description:
+          parameterType: STRING
+        pipelinechannel--model_name:
+          parameterType: STRING
+        pipelinechannel--name_bucket:
+          parameterType: STRING
+        pipelinechannel--project:
+          parameterType: STRING
+        pipelinechannel--testing-model-Output:
+          parameterType: NUMBER_DOUBLE
+  comp-create-custom-predict:
+    executorLabel: exec-create-custom-predict
+    inputDefinitions:
+      parameters:
+        credential_path:
+          parameterType: STRING
+        labels:
+          parameterType: STRUCT
+        location:
+          parameterType: STRING
+        name_bucket:
+          parameterType: STRING
+        project:
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
+  comp-get-data:
+    executorLabel: exec-get-data
+    inputDefinitions:
+      parameters:
+        credential_path:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+  comp-split-data:
+    executorLabel: exec-split-data
+    inputDefinitions:
+      artifacts:
+        data_input:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+      parameters:
+        credential_path:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        data_test:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+        data_train:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+        scaler:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+  comp-testing-model:
+    executorLabel: exec-testing-model
+    inputDefinitions:
+      artifacts:
+        data_test:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+        model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+      parameters:
+        credential_path:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+      parameters:
+        Output:
+          parameterType: NUMBER_DOUBLE
+  comp-train-model:
+    executorLabel: exec-train-model
+    inputDefinitions:
+      artifacts:
+        data_train:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+        scaler:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+      parameters:
+        credential_path:
+          parameterType: STRING
+        name_bucket:
+          parameterType: STRING
+        path_bucket:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+        model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+  comp-upload-to-model-registry:
+    executorLabel: exec-upload-to-model-registry
+    inputDefinitions:
+      artifacts:
+        input_model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+      parameters:
+        credential_path:
+          parameterType: STRING
+        description:
+          isOptional: true
+          parameterType: STRING
+        labels:
+          isOptional: true
+          parameterType: STRUCT
+        location:
+          parameterType: STRING
+        model_name:
+          parameterType: STRING
+        project:
+          parameterType: STRING
+        serving_container_image_uri:
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
+deploymentSpec:
+  executors:
+    exec-create-custom-predict:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - create_custom_predict
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.6.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'google-cloud-aiplatform[prediction]==1.31.0'\
+          \ && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef create_custom_predict(credential_path : str,\n              \
+          \            project         : str,\n                          location\
+          \        : str,\n                          name_bucket     : str,\n    \
+          \                      labels          : Dict)-> str:\n    #==== Define\
+          \ credentials ====#\n    import os\n    os.environ['GOOGLE_APPLICATION_CREDENTIALS']\
+          \ = credential_path\n    os.environ['GOOGLE_CLOUD_PROJECT'] = project\n\n\
+          \    #==== Define BASE_IMAGE ====#\n    repo_name  = list(labels.values())[0]\n\
+          \    container  = repo_name+'-cust-pred'\n    BASE_IMAGE = '{}-docker.pkg.dev/{}/{}/{}:latest'.format(location,\
+          \ project, repo_name, container)\n\n    #==== Build the Custom Predict Routine\
+          \ ====#\n    from pipeline.prod_modules import build_custom_predict_routine_image\n\
+          \    out, err = build_custom_predict_routine_image(BASE_IMAGE          \
+          \   = BASE_IMAGE,\n                                                  CUST_PRED_ROUTINE_PATH\
+          \ = \"pipeline/custom_prediction\",\n                                  \
+          \                NAME_BUCKET            = name_bucket)\n\n    print('El\
+          \ out es: ' + str(out))\n    print('El err es: ' + str(err))\n\n    return\
+          \ BASE_IMAGE\n\n"
+        image: us-central1-docker.pkg.dev/astral-reef-391421/mle-template/mle-template:latest
+        resources:
+          cpuLimit: 1.0
+          memoryLimit: 4.0
+    exec-get-data:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - get_data
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.6.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef get_data(credential_path : str,\n             dataset       \
+          \  : OutputPath(\"Dataset\")):\n\n    #==== Define credentials ====#\n \
+          \   import os\n    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credential_path\n\
+          \n    #==== Importing necessary libraries ====#\n    import pandas as pd\n\
+          \    from sklearn.datasets import load_iris\n\n    #==== Loading the Iris\
+          \ dataset ====#\n    iris = load_iris()\n    data = pd.DataFrame(data=iris['data'],\
+          \ columns=iris['feature_names'])\n    data['target'] = iris['target']\n\n\
+          \    # Define a mapping dictionary for the columns\n    column_mapping =\
+          \ {\n        'sepal length (cm)': 'sepal_length_cm',\n        'sepal width\
+          \ (cm)': 'sepal_width_cm',\n        'petal length (cm)': 'petal_length_cm',\n\
+          \        'petal width (cm)': 'petal_width_cm',\n    }\n\n    # Rename the\
+          \ columns using the mapping\n    data.rename(columns=column_mapping, inplace=True)\n\
+          \n    #==== Save the df in GCS ====#\n    from CustomLib.gcp import cloudstorage\n\
+          \    cloudstorage.write_csv(df       = data, \n                        \
+          \   gcs_path = dataset + '.csv')\n\n"
+        image: us-central1-docker.pkg.dev/astral-reef-391421/mle-template/mle-template:latest
+        resources:
+          cpuLimit: 1.0
+          memoryLimit: 4.0
+    exec-split-data:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - split_data
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.6.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef split_data(credential_path : str,\n               data_input\
+          \      : InputPath(\"Dataset\"),\n               scaler          : Output[Model],\n\
+          \               data_train      : OutputPath(\"Dataset\"),\n           \
+          \    data_test       : OutputPath(\"Dataset\"),):\n\n    #==== Define credentials\
+          \ ====#\n    import os\n    os.environ['GOOGLE_APPLICATION_CREDENTIALS']\
+          \ = credential_path\n\n    #==== Read input data from GCS ====#\n    from\
+          \ CustomLib.gcp import cloudstorage\n    data = cloudstorage.read_csv_as_df(gcs_path\
+          \ = data_input + '.csv')\n\n    #==== Preprocessing the data ====#\n   \
+          \ from src.utils import preprocess_data\n    train_df, test_df, scaler_model\
+          \ = preprocess_data(data)\n\n    #==== Save the df in GCS ====#\n    cloudstorage.write_csv(df\
+          \       = train_df, \n                           gcs_path = data_train +\
+          \ '.csv')\n    cloudstorage.write_csv(df       = test_df, \n           \
+          \                gcs_path = data_test + '.csv')\n\n    #==== Save the scaler\
+          \ in GCS ====#\n    cloudstorage.write_pickle(model    = scaler_model, \n\
+          \                              gcs_path = scaler.path + '/scaler.pkl')\n\
+          \n"
+        image: us-central1-docker.pkg.dev/astral-reef-391421/mle-template/mle-template:latest
+        resources:
+          cpuLimit: 1.0
+          memoryLimit: 4.0
+    exec-testing-model:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - testing_model
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.6.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef testing_model(credential_path : str,\n                   model\
+          \           : Input[Model],\n                   data_test       : InputPath(\"\
+          Dataset\"),\n                   metrics         : Output[Metrics])->float:\n\
+          \n    #==== Define credentials ====#\n    import os\n    os.environ['GOOGLE_APPLICATION_CREDENTIALS']\
+          \ = credential_path\n\n    #==== Read test data from GCS ====#\n    from\
+          \ CustomLib.gcp import cloudstorage\n    test_df = cloudstorage.read_csv_as_df(gcs_path\
+          \ = data_test + '.csv')\n\n    #==== Read model artifact ====#\n    model\
+          \ = cloudstorage.read_pickle(gcs_path = model.path + '/model.pkl')\n\n \
+          \   #==== Evaluating the model ====#\n    X_test = test_df.drop(columns=['target'])\n\
+          \    y_test = test_df['target']\n    predictions = model.predict(X_test)\n\
+          \n    #==== Getting metrics ====#\n    from src.utils import get_metrics\n\
+          \    logs, conf_matrix = get_metrics(y_test, predictions)\n\n    for metric,value\
+          \ in logs.items():\n        metrics.log_metric(metric, value)\n\n    return\
+          \ logs['f1']\n\n"
+        image: us-central1-docker.pkg.dev/astral-reef-391421/mle-template/mle-template:latest
+        resources:
+          cpuLimit: 1.0
+          memoryLimit: 4.0
+    exec-train-model:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - train_model
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.6.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef train_model(credential_path : str,\n                name_bucket\
+          \     : str,\n                path_bucket     : str,\n                data_train\
+          \      : InputPath(\"Dataset\"),\n                scaler          : Input[Model],\n\
+          \                model           : Output[Model],\n                metrics\
+          \         : Output[Metrics]):\n\n    #==== Define credentials ====#\n  \
+          \  import os\n    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credential_path\n\
+          \n    #==== Read train data from GCS ====#\n    from CustomLib.gcp import\
+          \ cloudstorage\n    train_df = cloudstorage.read_csv_as_df(gcs_path = data_train\
+          \ + '.csv')\n\n    #==== Save train data for monitoring ====#\n    file_name\
+          \ = \"last_training_path.txt\"\n    gcs_path = f\"gs://{name_bucket}/{path_bucket}/{file_name}\"\
+          \n    with open(file_name, 'w') as file:\n        file.write(data_train\
+          \ + '.csv')\n    cloudstorage.write_text(text_path = file_name, \n     \
+          \                       gcs_path  = gcs_path)\n\n    #==== Training the\
+          \ model ====#\n    from src.utils import train_model\n    # Separating features\
+          \ and target for training\n    X_train = train_df.drop(columns=['target'])\n\
+          \    y_train = train_df['target']\n\n    model_iris = train_model(X_train,\
+          \ y_train)\n\n    #==== Evaluating the model ====#\n    predictions = model_iris.predict(X_train)\n\
+          \n    #==== Getting metrics ====#\n    from src.utils import get_metrics\n\
+          \    log, conf_matrix = get_metrics(y_train, predictions)\n\n    for metric,value\
+          \ in log.items():\n        metrics.log_metric(metric, value)\n\n    #====\
+          \ Read scaler artifact ====#\n    scaler = cloudstorage.read_pickle(gcs_path\
+          \ = scaler.path + '/scaler.pkl')\n\n    #==== Save the model and scaler\
+          \ as a .pkl file ====#\n    cloudstorage.write_pickle(model    = model_iris,\
+          \ \n                              gcs_path = model.path + '/model.pkl')\n\
+          \    cloudstorage.write_pickle(model    = scaler, \n                   \
+          \           gcs_path = model.path + '/scaler.pkl')\n\n"
+        image: us-central1-docker.pkg.dev/astral-reef-391421/mle-template/mle-template:latest
+        resources:
+          cpuLimit: 1.0
+          memoryLimit: 4.0
+    exec-upload-to-model-registry:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - upload_to_model_registry
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.6.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'google-cloud-aiplatform==1.31.0'\
+          \ 'google-auth==2.17.3' 'google-auth-oauthlib==0.4.6' 'google-auth-httplib2==0.1.0'\
+          \ 'google-api-python-client==1.8.0' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef upload_to_model_registry(project                     : str,\n\
+          \                             location                    : str,\n     \
+          \                        model_name                  : str,\n          \
+          \                   serving_container_image_uri : str,\n               \
+          \              credential_path             : str,\n                    \
+          \         input_model                 : Input[Model],\n                \
+          \             description                 : str  = None,\n             \
+          \                labels                      : Dict = None,)->str:\n   \
+          \ import time\n    # Sleep for 600 seconds (10 minutes)\n    time.sleep(600)\n\
+          \n    #=== Get the correct artifact_uri for the model ===#\n    artifact_uri\
+          \ = input_model.path+'/'\n    print('El artifact uri es: '+str(artifact_uri))\n\
+          \n    #=== Generate a timestamp ===#\n    from datetime import datetime\n\
+          \    timestamp =datetime.now().strftime(\"%Y%m%d%H%M%S\")\n\n    #=== Initialize\
+          \ the aiplatform with the credentials ===#\n    import os\n    os.environ['GOOGLE_APPLICATION_CREDENTIALS']\
+          \ = credential_path\n\n    from google.oauth2.service_account import Credentials\n\
+          \    credentials = Credentials.from_service_account_file(credential_path)\n\
+          \n    from google.cloud import aiplatform\n    aiplatform.init(project \
+          \ = project, \n                    location  = location,\n             \
+          \       credentials=credentials)\n\n    #=== Check if exist a previous version\
+          \ of the model ===#\n    model_list=aiplatform.Model.list(filter = 'display_name=\"\
+          {}\"'.format(model_name))\n    if len(model_list)>0:\n        parent_model_name\
+          \ = model_list[0].name\n    else:\n        parent_model_name = None\n\n\
+          \    print('El URI es: '+ input_model.path.replace(\"/gcs/\", \"gs://\"\
+          , 1)+'/model_registry')\n\n    #=== Upload the model to Model Registry ===#\n\
+          \    model = aiplatform.Model.upload(display_name                    = model_name,\n\
+          \                                    artifact_uri                    = artifact_uri,\n\
+          \                                    parent_model                    = parent_model_name,\n\
+          \                                    description                     = description,\n\
+          \                                    labels                          = labels,\n\
+          \                                    serving_container_image_uri     = serving_container_image_uri,\n\
+          \                                    version_aliases                 = [model_name+'-'+timestamp],\
+          \  \n                                    staging_bucket                \
+          \  = input_model.path.replace(\"/gcs/\", \"gs://\", 1)+'/model_registry',\n\
+          \                                    serving_container_health_route  = \"\
+          /v1/models\",\n                                    serving_container_predict_route\
+          \ = \"/v1/models/predict\")\n\n    model.wait()\n\n    return model.name\n\
+          \n"
+        image: us-central1-docker.pkg.dev/astral-reef-391421/mle-template/mle-template:latest
+        resources:
+          cpuLimit: 1.0
+          memoryLimit: 4.0
+pipelineInfo:
+  name: mlops-mle-template
+root:
+  dag:
+    outputs:
+      artifacts:
+        testing-model-metrics:
+          artifactSelectors:
+          - outputArtifactKey: metrics
+            producerSubtask: testing-model
+        train-model-metrics:
+          artifactSelectors:
+          - outputArtifactKey: metrics
+            producerSubtask: train-model
+    tasks:
+      condition-1:
+        componentRef:
+          name: comp-condition-1
+        dependentTasks:
+        - testing-model
+        - train-model
+        inputs:
+          artifacts:
+            pipelinechannel--train-model-model:
+              taskOutputArtifact:
+                outputArtifactKey: model
+                producerTask: train-model
+          parameters:
+            pipelinechannel--credential_path:
+              componentInputParameter: credential_path
+            pipelinechannel--labels:
+              componentInputParameter: labels
+            pipelinechannel--location:
+              componentInputParameter: location
+            pipelinechannel--model_description:
+              componentInputParameter: model_description
+            pipelinechannel--model_name:
+              componentInputParameter: model_name
+            pipelinechannel--name_bucket:
+              componentInputParameter: name_bucket
+            pipelinechannel--project:
+              componentInputParameter: project
+            pipelinechannel--testing-model-Output:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: testing-model
+        taskInfo:
+          name: model-upload-condition
+        triggerPolicy:
+          condition: inputs.parameter_values['pipelinechannel--testing-model-Output']
+            > 0.96
+      get-data:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-get-data
+        inputs:
+          parameters:
+            credential_path:
+              componentInputParameter: credential_path
+        taskInfo:
+          name: Get Data
+      split-data:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-split-data
+        dependentTasks:
+        - get-data
+        inputs:
+          artifacts:
+            data_input:
+              taskOutputArtifact:
+                outputArtifactKey: dataset
+                producerTask: get-data
+          parameters:
+            credential_path:
+              componentInputParameter: credential_path
+        taskInfo:
+          name: Split Data
+      testing-model:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-testing-model
+        dependentTasks:
+        - split-data
+        - train-model
+        inputs:
+          artifacts:
+            data_test:
+              taskOutputArtifact:
+                outputArtifactKey: data_test
+                producerTask: split-data
+            model:
+              taskOutputArtifact:
+                outputArtifactKey: model
+                producerTask: train-model
+          parameters:
+            credential_path:
+              componentInputParameter: credential_path
+        taskInfo:
+          name: Testing Model
+      train-model:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-train-model
+        dependentTasks:
+        - split-data
+        inputs:
+          artifacts:
+            data_train:
+              taskOutputArtifact:
+                outputArtifactKey: data_train
+                producerTask: split-data
+            scaler:
+              taskOutputArtifact:
+                outputArtifactKey: scaler
+                producerTask: split-data
+          parameters:
+            credential_path:
+              componentInputParameter: credential_path
+            name_bucket:
+              componentInputParameter: name_bucket
+            path_bucket:
+              componentInputParameter: path_bucket
+        taskInfo:
+          name: Train Model
+  inputDefinitions:
+    parameters:
+      credential_path:
+        parameterType: STRING
+      labels:
+        parameterType: STRUCT
+      location:
+        parameterType: STRING
+      model_description:
+        parameterType: STRING
+      model_name:
+        parameterType: STRING
+      name_bucket:
+        parameterType: STRING
+      path_bucket:
+        parameterType: STRING
+      project:
+        parameterType: STRING
+  outputDefinitions:
+    artifacts:
+      testing-model-metrics:
+        artifactType:
+          schemaTitle: system.Metrics
+          schemaVersion: 0.0.1
+      train-model-metrics:
+        artifactType:
+          schemaTitle: system.Metrics
+          schemaVersion: 0.0.1
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.6.0
