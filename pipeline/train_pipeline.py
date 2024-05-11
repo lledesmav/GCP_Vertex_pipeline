@@ -33,23 +33,18 @@ BASE_IMAGE                = '{}-docker.pkg.dev/{}/{}/{}:'.format(REGION,
                                                                  BASE_CONTAINER_IMAGE_NAME, 
                                                                  BASE_CONTAINER_IMAGE_NAME)+'latest'
 
-import os
-os.environ.get("GOOGLE_APPLICATION_CREDENTIALS") == CREDENTIAL_PATH
+# import os
+# os.environ.get("GOOGLE_APPLICATION_CREDENTIALS") == CREDENTIAL_PATH
 
 from google.oauth2.service_account import Credentials
-credentials = Credentials.from_service_account_file(CREDENTIAL_PATH)
-aiplatform.init(project=PROJECT, location=REGION, credentials=credentials)
+# credentials = Credentials.from_service_account_file(CREDENTIAL_PATH)
+# aiplatform.init(project=PROJECT, location=REGION, credentials=credentials)
 
 ##############################################################################################
 #===================================== get_data COMPONENT ===================================#
 ##############################################################################################
 @component(base_image = BASE_IMAGE)
-def get_data(credential_path : str,
-             dataset         : OutputPath("Dataset")):
-    
-    #==== Define credentials ====#
-    import os
-    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credential_path
+def get_data(dataset : OutputPath("Dataset")):
     
     #==== Importing necessary libraries ====#
     import pandas as pd
@@ -87,10 +82,6 @@ def split_data(credential_path : str,
                data_train      : OutputPath("Dataset"),
                data_test       : OutputPath("Dataset"),):
     
-    #==== Define credentials ====#
-    import os
-    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credential_path
-    
     #==== Read input data from GCS ====#
     from CustomLib.gcp import cloudstorage
     data = cloudstorage.read_csv_as_df(gcs_path = data_input + '.csv')
@@ -120,10 +111,6 @@ def train_model(credential_path : str,
                 scaler          : Input[Model],
                 model           : Output[Model],
                 metrics         : Output[Metrics]):
-
-    #==== Define credentials ====#
-    import os
-    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credential_path
     
     #==== Read train data from GCS ====#
     from CustomLib.gcp import cloudstorage
@@ -209,10 +196,6 @@ def create_custom_predict(credential_path : str,
                           location        : str,
                           name_bucket     : str,
                           labels          : Dict)-> str:
-    #==== Define credentials ====#
-    import os
-    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credential_path
-    os.environ['GOOGLE_CLOUD_PROJECT'] = project
     
     #==== Define BASE_IMAGE ====#
     repo_name  = list(labels.values())[0]
@@ -233,43 +216,58 @@ def create_custom_predict(credential_path : str,
 ######################################################################################### 
 #========================= upload_to_model_registry COMPONENT ==========================#
 ######################################################################################### 
-@component(base_image = BASE_IMAGE,
-           packages_to_install=["google-cloud-aiplatform==1.31.0", 
+@component(base_image="python:3.9",
+           packages_to_install=["google-cloud-aiplatform==1.29.0", 
                                 "google-auth==2.17.3",
                                 "google-auth-oauthlib==0.4.6",
                                 "google-auth-httplib2==0.1.0",
                                 "google-api-python-client==1.8.0"])
 def upload_to_model_registry(project                     : str,
                              location                    : str,
+                             name_bucket                 : str,
+                             path_bucket                 : str,
                              model_name                  : str,
                              serving_container_image_uri : str,
-                             credential_path             : str,
                              input_model                 : Input[Model],
+                             credential_dict             : Dict = None,
                              description                 : str  = None,
                              labels                      : Dict = None,)->str:
-    import time
-    # Sleep for 600 seconds (10 minutes)
-    time.sleep(600)
+    """
+    Upload a trained model to the Google Cloud AI Platform's Model Registry, creates a version of the model, and returns the uploaded model's name.
+
+    Args:
+        project (str)                     : The Google Cloud Project ID.
+        location (str)                    : The region for the Google Cloud Project.
+        model_name (str)                  : The name for the model in the model registry.
+        serving_container_image_uri (str) : The URI of the serving container image.
+        description (str, optional)       : A description for the uploaded model. Defaults to None.
+        labels (Dict, optional)           : A dictionary containing labels for the uploaded model. Defaults to None.
+        credential_dict (Dict)            : A dictionary containing the service account credentials.
+        input_model (Input[Model])        : The trained model to be uploaded.
     
+    Returns:
+        (str): The name of the uploaded model in the Google Cloud AI Platform's Model Registry.
+    """
     #=== Get the correct artifact_uri for the model ===#
     artifact_uri = input_model.path+'/'
-    print('El artifact uri es  : '+str(artifact_uri))
     
     #=== Generate a timestamp ===#
     from datetime import datetime
     timestamp =datetime.now().strftime("%Y%m%d%H%M%S")
     
     #=== Initialize the aiplatform with the credentials ===#
-    import os
-    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credential_path
-    
-    from google.oauth2.service_account import Credentials
-    credentials = Credentials.from_service_account_file(credential_path)
-    
     from google.cloud import aiplatform
-    aiplatform.init(project  = project, 
-                    location  = location,
-                    credentials=credentials)
+    from google.oauth2 import service_account
+    from google.auth import default
+    
+    if credential_dict:
+        # Initialize AI Platform with service account credentials from dict
+        credentials = service_account.Credentials.from_service_account_info(credential_dict)
+    else:
+        # Use default credentials
+        credentials, _ = default()
+
+    aiplatform.init(project=project, location=location, credentials=credentials)
     
     #=== Check if exist a previous version of the model ===#
     model_list=aiplatform.Model.list(filter = 'display_name="{}"'.format(model_name))
@@ -277,9 +275,8 @@ def upload_to_model_registry(project                     : str,
         parent_model_name = model_list[0].name
     else:
         parent_model_name = None
-    
-    print('El URI es: '+ input_model.path.replace("/gcs/", "gs://", 1)+'/model_registry')
 
+    staging_bucket = f"gs://{name_bucket}/{path_bucket}/model-registry/{model_name}-{timestamp}"
     #=== Upload the model to Model Registry ===#
     model = aiplatform.Model.upload(display_name                    = model_name,
                                     artifact_uri                    = artifact_uri,
@@ -287,12 +284,15 @@ def upload_to_model_registry(project                     : str,
                                     description                     = description,
                                     labels                          = labels,
                                     serving_container_image_uri     = serving_container_image_uri,
-                                    version_aliases                 = [model_name+'-'+timestamp],  
-                                    staging_bucket                  = input_model.path.replace("/gcs/", "gs://", 1)+'/model_registry',
+                                    version_aliases                 = [model_name+'-'+timestamp],        
                                     serving_container_health_route  = "/v1/models",
-                                    serving_container_predict_route = "/v1/models/predict")
+                                    serving_container_predict_route = "/v1/models/predict",
+                                    staging_bucket                  = staging_bucket)
 
     model.wait()
+    
+    import time
+    time.sleep(300)
     
     return model.name
     
@@ -300,41 +300,61 @@ def upload_to_model_registry(project                     : str,
 ######################################################################################### 
 #========================== deploy_model_endpoint COMPONENT ============================#
 ######################################################################################### 
-@component(base_image = BASE_IMAGE)
+@component(base_image="python:3.9",
+           packages_to_install=["google-cloud-aiplatform==1.29.0", 
+                                "google-auth==2.17.3",
+                                "google-auth-oauthlib==0.4.6",
+                                "google-auth-httplib2==0.1.0",
+                                "google-api-python-client==1.8.0"])
 def deploy_model_endpoint(project         : str,
                           location        : str,
                           model_name      : str,
                           model_id        : str,
-                          credential_path : str)->str:
+                          machine_type    : str,
+                          credential_dict : Dict = None,
+                          service_account_mail : str = None,
+                          labels          : Dict = None)->str:
     
     #=== Initialize the aiplatform with the credentials ===#
-    import os
-    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credential_path
-    
-    from google.oauth2.service_account import Credentials
-    credentials = Credentials.from_service_account_file(credential_path)
-    
     from google.cloud import aiplatform
-    aiplatform.init(project  = project, 
-                    location = location,
-                    credentials=credentials)
+    from google.oauth2 import service_account
+    from google.auth import default
+    
+    if credential_dict:
+        # Initialize AI Platform with service account credentials from dict
+        credentials = service_account.Credentials.from_service_account_info(credential_dict)
+    else:
+        # Use default credentials
+        credentials, _ = default()
+        
+    aiplatform.init(project     = project, 
+                    location    = location, 
+                    credentials = credentials)
     
     # Request if exist a endpoint
-    from pipeline.prod_modules import get_endpoint_by_display_name
+    def get_endpoint_by_display_name(display_name: str):
+        endpoints = aiplatform.Endpoint.list() # List all available endpoints
+        # Filter the endpoints by the given display_name
+        for endpoint in endpoints:
+            if endpoint.display_name == display_name:
+                return endpoint
+        return None
+                                                                  
     endpoint = get_endpoint_by_display_name(display_name = model_name + "-endpoint")
     if endpoint:
         pass
     else:
-        endpoint = aiplatform.Endpoint.create(display_name = model_name + "-endpoint")
+        endpoint = aiplatform.Endpoint.create(display_name = model_name + "-endpoint",
+                                              labels       = labels)
     
     # Get the model
     model= aiplatform.Model(model_name=model_id)
     
     # Deploy the model in a endpoint
     deploy=model.deploy(endpoint=endpoint,
-                        min_replica_count = 1,
                         traffic_percentage=100,
-                        machine_type="n1-standard-2")
+                        machine_type=machine_type,
+                        service_account=service_account_mail)
     
     return str(endpoint.name)
     
@@ -350,63 +370,61 @@ def train_pipeline(credential_path   : str,
                    labels            : Dict,
                    model_name        : str,
                    model_description : str):
-    get_data_op = get_data(credential_path = credential_path)\
-                                          .set_cpu_limit('1')\
-                                          .set_memory_limit('4G')\
-                                          .set_display_name('Get Data')
+    get_data_op = get_data()\
+        .set_cpu_limit('1')\
+        .set_memory_limit('4G')\
+        .set_display_name('Get Data')
     
-    split_data_op = split_data(credential_path = credential_path,
-                               data_input      = get_data_op.outputs['dataset'])\
+    split_data_op = split_data(data_input = get_data_op.outputs['dataset'])\
     .set_cpu_limit('1')\
     .set_memory_limit('4G')\
     .set_display_name('Split Data')
     
-    train_model_op = train_model(credential_path = credential_path,
-                                 name_bucket     = name_bucket,
-                                 path_bucket     = path_bucket,
-                                 data_train      = split_data_op.outputs['data_train'],
-                                 scaler          = split_data_op.outputs['scaler'])\
+    train_model_op = train_model(name_bucket = name_bucket,
+                                 path_bucket = path_bucket,
+                                 data_train  = split_data_op.outputs['data_train'],
+                                 scaler      = split_data_op.outputs['scaler'])\
     .set_cpu_limit('1')\
     .set_memory_limit('4G')\
     .set_display_name('Train Model')
     
-    testing_model_op = testing_model(credential_path = credential_path,
-                                     model           = train_model_op.outputs['model'],
-                                     data_test       = split_data_op.outputs['data_test'])\
+    testing_model_op = testing_model(model     = train_model_op.outputs['model'],
+                                     data_test = split_data_op.outputs['data_test'])\
     .set_cpu_limit('1')\
     .set_memory_limit('4G')\
     .set_display_name('Testing Model')
     
     with Condition(testing_model_op.outputs["Output"] > 0.96, name='model-upload-condition'):
-        custom_predict_op = create_custom_predict(credential_path = credential_path,
-                                                  project         = project,
-                                                  location        = location,
-                                                  name_bucket     = name_bucket,
-                                                  labels          = labels)\
+        custom_predict_op = create_custom_predict(project     = project,
+                                                  location    = location,
+                                                  name_bucket = name_bucket,
+                                                  labels      = labels)\
         .set_cpu_limit('1')\
         .set_memory_limit('4G')\
         .set_display_name('Create Custom Predict Image')
 
         upload_model_op = upload_to_model_registry(project                     = project,
                                                    location                    = location,
+                                                   name_bucket                 = name_bucket,
+                                                   path_bucket                 = path_bucket,
                                                    model_name                  = model_name,
                                                    serving_container_image_uri = custom_predict_op.outputs["Output"],
-                                                   credential_path             = credential_path,
                                                    input_model                 = train_model_op.outputs['model'],
                                                    description                 = model_description,
                                                    labels                      = labels)\
         .set_cpu_limit('1')\
         .set_memory_limit('4G')\
         .set_display_name('Save Model')
-        
-        # deploy_model_endpoint_op = deploy_model_endpoint(project         = project,
-        #                                                  location        = location,
-        #                                                  model_name      = model_name,
-        #                                                  model_id        = upload_model_op.outputs["Output"],
-        #                                                  credential_path = credential_path)\
-        # .set_cpu_limit('1')\
-        # .set_memory_limit('4G')\
-        # .set_display_name('Deploy model in an endpoint')
+
+        deploy_model_endpoint_op = deploy_model_endpoint(project         = project,
+                                                     location        = location,
+                                                     model_name      = model_name,
+                                                     model_id        = upload_model_op.outputs["Output"],
+                                                     machine_type    = 'n1-standard-2',
+                                                     labels          = labels)\
+        .set_cpu_limit('4')\
+        .set_memory_limit('8G')\
+        .set_display_name('Deploy model in an endpoint')
 
 ###################################################################################
 #================================= COMPILE & RUN =================================#
@@ -419,8 +437,7 @@ def compile_pipeline(path_bucket       : str = PATH_BUCKET,
     compiler.Compiler().compile(pipeline_func = train_pipeline,
                                 package_path  = compile_name_file)
     # Initialize credentials
-    credentials = Credentials.from_service_account_file(CREDENTIAL_PATH)
-    client = storage.Client(credentials=credentials)
+    client = storage.Client()
     
     ### Send file(s) to bucket
     #client = storage.Client()
@@ -458,17 +475,8 @@ def run_pipeline(credential_path   : str = CREDENTIAL_PATH,
                                             labels           = labels,
                                             enable_caching   = False,
                                             location         = location,
-                                            credentials      = credentials,
                                             parameter_values = pipeline_parameters)
     
-    # Open the file for reading
-    with open(credential_path, 'r') as file:
-        credentials_json = json.load(file)
-
-    # Access to service_account
-    service_acc = credentials_json.get('client_email')
-
-    # Execution of the pipeline
-    start_pipeline.submit(service_account=service_acc)
+    start_pipeline.submit()
     
     return '-- OK RUN --'

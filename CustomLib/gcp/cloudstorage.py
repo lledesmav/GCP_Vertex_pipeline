@@ -41,7 +41,6 @@ def write_csv(df: pd.DataFrame,
     Returns: 
         None
     """
-    #log_lib("Ferreylib.gcp.cloudstorage.write_csv")
     if credential_path != '':
         from google.oauth2 import service_account
         credentials = service_account.Credentials.from_service_account_file(credential_path, scopes=["https://www.googleapis.com/auth/cloud-platform"],)
@@ -74,7 +73,6 @@ def read_csv_as_df(gcs_path:str,
     Returns: 
         A pandas DataFrame containing the data from the CSV file.
     """
-    #log_lib("Ferreylib.gcp.cloudstorage.read_csv_as_df")
     if credential_path != '':
         from google.oauth2 import service_account
         credentials = service_account.Credentials.from_service_account_file(credential_path, scopes=["https://www.googleapis.com/auth/cloud-platform"],)
@@ -109,7 +107,6 @@ def write_pickle(model,
     Returns: 
         None
     """
-    #log_lib("Ferreylib.gcp.cloudstorage.write_pickle")
     if credential_path != '':
         from google.oauth2 import service_account
         credentials = service_account.Credentials.from_service_account_file(credential_path, scopes=["https://www.googleapis.com/auth/cloud-platform"],)
@@ -141,7 +138,6 @@ def read_pickle(gcs_path:str,
     Returns: 
         The deserialized Python object stored in the Pickle file.
     """
-    #log_lib("Ferreylib.gcp.cloudstorage.read_pickle")
     if credential_path != '':
         from google.oauth2 import service_account
         credentials = service_account.Credentials.from_service_account_file(credential_path, scopes=["https://www.googleapis.com/auth/cloud-platform"],)
@@ -160,7 +156,7 @@ def read_pickle(gcs_path:str,
     # Load the pickle data into a DataFrame using pd.read_pickle()
     model = pd.read_pickle(pkl_buffer)
     
-    return model    
+    return model
 
 def write_text(text_path:str, 
                gcs_path:str,
@@ -176,7 +172,6 @@ def write_text(text_path:str,
     Returns: 
         None
     """
-    #log_lib("Ferreylib.gcp.cloudstorage.write_text")
     if credential_path != '':
         from google.oauth2 import service_account
         credentials = service_account.Credentials.from_service_account_file(credential_path, scopes=["https://www.googleapis.com/auth/cloud-platform"],)

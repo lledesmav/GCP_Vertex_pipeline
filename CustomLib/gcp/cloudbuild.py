@@ -1,7 +1,6 @@
 from typing import Tuple, Any
 import subprocess
 import os
-#from FerreyLib.utils_log import log_lib
 
 def review_credentials(credential_path:str, project_id:str) -> None:
     """
@@ -39,15 +38,20 @@ def submit(image_name:str,
         out (bytes): Standard output from the gcloud command execution.
         err (bytes): Standard error output from the gcloud command execution.
     """
-    #log_lib("Ferreylib.gcp.cloudbuild.submit")
     #Review credentials
     review_credentials(credential_path, project_id)
-    # Set the Google Cloud Project ID
+    
     env = os.environ.copy()
+    # Activate the service account only if credential_path is provided
+    if 'GOOGLE_APPLICATION_CREDENTIALS' in env and env['GOOGLE_APPLICATION_CREDENTIALS']:
+        activate_command = 'gcloud auth activate-service-account --key-file={}'.format(env['GOOGLE_APPLICATION_CREDENTIALS'])
+        _ = subprocess.run(activate_command, shell=True, env=env)
+    else:
+        print("Using default credentials or already authenticated; skipping service account activation.")
+    
+    # Set the Google Cloud Project ID
     _ = subprocess.run('gcloud config set project {}'.format(os.environ['GOOGLE_CLOUD_PROJECT']), shell=True, env=env)
-    # Activate the service account 
-    activate_command = 'gcloud auth activate-service-account --key-file={}'.format(os.environ['GOOGLE_APPLICATION_CREDENTIALS'])
-    _ = subprocess.run(activate_command, shell=True, env=env)
+    
     #Define job
     command = 'gcloud builds submit --tag {} {} --gcs-source-staging-dir gs://{}/cloud-build-pipelines'.format(image_name, code_path, name_bucket)
     result = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
