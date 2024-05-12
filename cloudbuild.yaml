@@ -41,9 +41,9 @@ steps:
       - '-c'
       - |
         set -e  # Stop execution on any error
-        URL=$(gcloud run services describe $_CLOUD_RUN_SERVICE --region=$_REGION --platform=managed --format='value(status.url)')
-        echo "Executing Cloud Run service at $URL" &&
-        curl "$URL/$_PIPELINE_TYPE"
+        _URL=$(gcloud run services describe $_CLOUD_RUN_SERVICE --region=$_REGION --platform=managed --format='value(status.url)')
+        echo "Executing Cloud Run service at $_URL" &&
+        curl "$_URL/$_PIPELINE_TYPE"
 
 substitutions:
   _PROJECT_ID: 'astral-reef-391421'
