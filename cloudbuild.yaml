@@ -30,7 +30,12 @@ steps:
       - |
         set -e  # Stop execution on any error
         _URL=$(gcloud run services describe $_CLOUD_RUN_SERVICE --region=$_REGION --platform=managed --format='value(status.url)')
-        echo "Executing Cloud Run service at $_URL" &&
+        echo "URL fetched: $_URL"  # Debug: Print the URL to the log to confirm it's correct
+        if [ -z "$_URL" ]; then
+          echo "Error: No URL found"  # Error handling: In case URL is empty
+          exit 1
+        fi
+        echo "Executing Cloud Run service at $URL" &&
         curl "$_URL/$_PIPELINE_TYPE"
 
 substitutions:
