@@ -50,9 +50,9 @@ steps:
           sleep 10
           _STATUS=$(gcloud run services describe $_CLOUD_RUN_SERVICE --region=$_REGION --platform=managed --format='value(status.conditions[0].status)')
         done
-        URL=$(gcloud run services describe $_CLOUD_RUN_SERVICE --region=$_REGION --platform=managed --format='value(status.url)')
-        echo "Service is stable and running at $URL"
-        curl "$URL/$_PIPELINE_TYPE"
+        echo "Service is stable"
+        curl "$(gcloud run services describe $_CLOUD_RUN_SERVICE --region=$_REGION --platform=managed --format='value(status.url)')/train_pipeline"
+        curl "$(gcloud run services describe $_CLOUD_RUN_SERVICE --region=$_REGION --platform=managed --format='value(status.url)')/predict_pipeline"
 
 substitutions:
   _PROJECT_ID: 'astral-reef-391421'
