@@ -44,12 +44,7 @@ steps:
       - |
         set -e  # Stop execution on any error
         # Wait for the service to be fully ready
-        echo "Checking service readiness..."
-        until curl --output /dev/null --silent --head --fail "$(gcloud run services describe $_CLOUD_RUN_SERVICE --region=$_REGION --platform=managed --format='value(status.url)')"; do
-          printf '.'
-          sleep 5
-        done
-        echo "Service is ready."
+        sleep 15
         # Accessing train_pipeline
         curl "$(gcloud run services describe $_CLOUD_RUN_SERVICE --region=$_REGION --platform=managed --format='value(status.url)')/train_pipeline"
         # Accessing predict_pipeline
