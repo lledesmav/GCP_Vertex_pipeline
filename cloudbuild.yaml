@@ -44,11 +44,11 @@ steps:
       - |
         set -e  # Stop execution on any error
         # Check service status
-        STATUS=$(gcloud run services describe $_CLOUD_RUN_SERVICE --region=$_REGION --platform=managed --format='value(status.conditions[0].status)')
-        while [ "$STATUS" != "True" ]; do
+        _STATUS=$(gcloud run services describe $_CLOUD_RUN_SERVICE --region=$_REGION --platform=managed --format='value(status.conditions[0].status)')
+        while [ "$_STATUS" != "True" ]; do
           echo "Waiting for service to become stable..."
           sleep 10
-          STATUS=$(gcloud run services describe $_CLOUD_RUN_SERVICE --region=$_REGION --platform=managed --format='value(status.conditions[0].status)')
+          _STATUS=$(gcloud run services describe $_CLOUD_RUN_SERVICE --region=$_REGION --platform=managed --format='value(status.conditions[0].status)')
         done
         URL=$(gcloud run services describe $_CLOUD_RUN_SERVICE --region=$_REGION --platform=managed --format='value(status.url)')
         echo "Service is stable and running at $URL"
