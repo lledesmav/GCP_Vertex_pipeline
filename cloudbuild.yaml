@@ -29,8 +29,8 @@ steps:
       - '-c'
       - |
         set -e  # Stop execution on any error
-        echo "gcloud run services describe $_CLOUD_RUN_SERVICE --region=$_REGION --platform=managed --format='value(status.url)'"
-        curl "gcloud run services describe $_CLOUD_RUN_SERVICE --region=$_REGION --platform=managed --format='value(status.url)'/$_PIPELINE_TYPE"
+        echo "$(gcloud run services describe $_CLOUD_RUN_SERVICE --region=$_REGION --platform=managed --format='value(status.url)')"
+        curl "$(gcloud run services describe $_CLOUD_RUN_SERVICE --region=$_REGION --platform=managed --format='value(status.url)')/$_PIPELINE_TYPE"
 
 substitutions:
   _PROJECT_ID: 'astral-reef-391421'
@@ -40,6 +40,6 @@ substitutions:
   _CLOUD_RUN_SERVICE: 'mle-template-service'
   _PIPELINE_TYPE: 'train_pipeline'
 
-images:
-  - '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY_NAME/$_IMAGE_NAME:latest'
+# images:
+#   - '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY_NAME/$_IMAGE_NAME:latest'
 
