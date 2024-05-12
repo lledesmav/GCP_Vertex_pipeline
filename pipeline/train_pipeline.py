@@ -7,6 +7,7 @@ from google.cloud import aiplatform
 from datetime import datetime
 from google.oauth2.service_account import Credentials
 from google_cloud_pipeline_components.v1.vertex_notification_email import VertexNotificationEmailOp
+from kfp import dsl
 
 ########################################################################################
 #=========================  Get VARIABLES & BASE_IMAGE   ==============================#
