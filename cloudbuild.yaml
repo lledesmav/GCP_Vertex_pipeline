@@ -22,16 +22,28 @@ steps:
       - '--platform=managed'
       - '--allow-unauthenticated'
 
-  # Step 3: Execute the Cloud Run URL
+  # Step 3: Get the URL of the deployed Cloud Run service
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'services'
+      - 'describe'
+      - '$_CLOUD_RUN_SERVICE'
+      - '--region=$_REGION'
+      - '--platform=managed'
+      - '--format=value(status.url)'
+
+  # Step 4: Execute the Cloud Run URL
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'sh'
     args:
       - '-c'
       - |
         set -e  # Stop execution on any error
-        gcloud run services describe $_CLOUD_RUN_SERVICE --region=$_REGION --platform=managed --format='value(status.url)'
-        echo "Executing Cloud Run service at https://$_CLOUD_RUN_SERVICE-6ks3mtyyxq-uc.a.run.app/$_PIPELINE_TYPE" &&
-        curl "https://$_CLOUD_RUN_SERVICE-6ks3mtyyxq-uc.a.run.app/$_PIPELINE_TYPE"
+        URL=$(gcloud run services describe $_CLOUD_RUN_SERVICE --region=$_REGION --platform=managed --format='value(status.url)')
+        echo "Executing Cloud Run service at $URL" &&
+        curl "$URL/$_PIPELINE_TYPE"
 
 substitutions:
   _PROJECT_ID: 'astral-reef-391421'
