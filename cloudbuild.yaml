@@ -6,11 +6,25 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: ['build', '-t', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY_NAME/$_IMAGE_NAME:latest', '.']
 
-  # Step 1: Push the image to Google Artifact Registry
+  # Step 1: Check if the Artifact Repository exists and create it if not
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        if ! gcloud artifacts repositories describe $_REPOSITORY_NAME --location=$_REGION --format='value(name)'; then
+          echo "Repository $_REPOSITORY_NAME does not exist. Creating repository..."
+          gcloud artifacts repositories create $_REPOSITORY_NAME --repository-format=docker --location=$_REGION
+          echo "Repository $_REPOSITORY_NAME created."
+        else
+          echo "Repository $_REPOSITORY_NAME already exists."
+        fi
+
+  # Step 2: Push the image to Google Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY_NAME/$_IMAGE_NAME:latest']
 
-  # Step 2: Deploy the image to Google Cloud Run
+  # Step 3: Deploy the image to Google Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
     args:
@@ -22,14 +36,15 @@ steps:
       - '--platform=managed'
       - '--allow-unauthenticated'
 
-  # Step 3: Get and use the URL of the deployed Cloud Run service
+  # Step 4: Get and use the URL of the deployed Cloud Run service
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'sh'
     args:
       - '-c'
       - |
         set -e  # Stop execution on any error
-        curl "$(gcloud run services describe $_CLOUD_RUN_SERVICE --region=$_REGION --platform=managed --format='value(status.url)')/$_PIPELINE_TYPE"
+        curl "$(gcloud run services describe $_CLOUD_RUN_SERVICE --region=$_REGION --platform=managed --format='value(status.url)')/train_pipeline"
+        curl "$(gcloud run services describe $_CLOUD_RUN_SERVICE --region=$_REGION --platform=managed --format='value(status.url)')/predict_pipeline"
         
 substitutions:
   _PROJECT_ID: 'astral-reef-391421'
@@ -37,7 +52,3 @@ substitutions:
   _REPOSITORY_NAME: 'mle-template'
   _IMAGE_NAME: 'mle-template'
   _CLOUD_RUN_SERVICE: 'mle-template-service'
-  _PIPELINE_TYPE: 'train_pipeline'
-
-# images:
-#   - '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY_NAME/$_IMAGE_NAME:latest'
