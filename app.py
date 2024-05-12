@@ -16,7 +16,14 @@ def train_pipeline():
 def predict_pipeline():
     from pipeline.predict_pipeline import compile_pipeline, run_pipeline
     compile_pipeline()
-    run_pipeline()
+    run_pipeline(scheduled=True)
+    return 'Ejecución Correcta!'
+
+@app.route("/on_demand_predict_pipeline")
+def predict_pipeline():
+    from pipeline.predict_pipeline import compile_pipeline, run_pipeline
+    compile_pipeline()
+    run_pipeline(scheduled=False)
     return 'Ejecución Correcta!'
 
 @app.route("/monitoring")
@@ -25,4 +32,3 @@ def monitoring():
     render_ = all_models()
     
     return render_
-

@@ -6,6 +6,7 @@ from google.cloud import storage
 from google.cloud import aiplatform
 from datetime import datetime
 from google.oauth2.service_account import Credentials
+from google_cloud_pipeline_components.v1.vertex_notification_email import VertexNotificationEmailOp
 
 ########################################################################################
 #=========================  Get VARIABLES & BASE_IMAGE   ==============================#
@@ -356,61 +357,66 @@ def train_pipeline(project           : str,
                    labels            : Dict,
                    model_name        : str,
                    model_description : str):
-    get_data_op = get_data()\
-        .set_cpu_limit('1')\
-        .set_memory_limit('4G')\
-        .set_display_name('Get Data')
     
-    split_data_op = split_data(data_input = get_data_op.outputs['dataset'])\
-    .set_cpu_limit('1')\
-    .set_memory_limit('4G')\
-    .set_display_name('Split Data')
-    
-    train_model_op = train_model(name_bucket = name_bucket,
-                                 path_bucket = path_bucket,
-                                 data_train  = split_data_op.outputs['data_train'],
-                                 scaler      = split_data_op.outputs['scaler'])\
-    .set_cpu_limit('1')\
-    .set_memory_limit('4G')\
-    .set_display_name('Train Model')
-    
-    testing_model_op = testing_model(model     = train_model_op.outputs['model'],
-                                     data_test = split_data_op.outputs['data_test'])\
-    .set_cpu_limit('1')\
-    .set_memory_limit('4G')\
-    .set_display_name('Testing Model')
-    
-    with Condition(testing_model_op.outputs["Output"] > 0.96, name='model-upload-condition'):
-        custom_predict_op = create_custom_predict(project     = project,
-                                                  location    = location,
-                                                  name_bucket = name_bucket,
-                                                  labels      = labels)\
-        .set_cpu_limit('1')\
-        .set_memory_limit('4G')\
-        .set_display_name('Create Custom Predict Image')
+    notify_email_task = VertexNotificationEmailOp(recipients=config['PIPELINE_ALERT_MAILS'])
 
-        upload_model_op = upload_to_model_registry(project                     = project,
-                                                   location                    = location,
-                                                   name_bucket                 = name_bucket,
-                                                   path_bucket                 = path_bucket,
-                                                   model_name                  = model_name,
-                                                   serving_container_image_uri = custom_predict_op.outputs["Output"],
-                                                   input_model                 = train_model_op.outputs['model'],
-                                                   description                 = model_description,
-                                                   labels                      = labels)\
+    with dsl.ExitHandler(notify_email_task):
+    
+        get_data_op = get_data()\
+            .set_cpu_limit('1')\
+            .set_memory_limit('4G')\
+            .set_display_name('Get Data')
+
+        split_data_op = split_data(data_input = get_data_op.outputs['dataset'])\
         .set_cpu_limit('1')\
         .set_memory_limit('4G')\
-        .set_display_name('Save Model')
+        .set_display_name('Split Data')
 
-        # deploy_model_endpoint_op = deploy_model_endpoint(project         = project,
-        #                                              location        = location,
-        #                                              model_name      = model_name,
-        #                                              model_id        = upload_model_op.outputs["Output"],
-        #                                              machine_type    = 'n1-standard-2',
-        #                                              labels          = labels)\
-        # .set_cpu_limit('4')\
-        # .set_memory_limit('8G')\
-        # .set_display_name('Deploy model in an endpoint')
+        train_model_op = train_model(name_bucket = name_bucket,
+                                     path_bucket = path_bucket,
+                                     data_train  = split_data_op.outputs['data_train'],
+                                     scaler      = split_data_op.outputs['scaler'])\
+        .set_cpu_limit('1')\
+        .set_memory_limit('4G')\
+        .set_display_name('Train Model')
+
+        testing_model_op = testing_model(model     = train_model_op.outputs['model'],
+                                         data_test = split_data_op.outputs['data_test'])\
+        .set_cpu_limit('1')\
+        .set_memory_limit('4G')\
+        .set_display_name('Testing Model')
+
+        with Condition(testing_model_op.outputs["Output"] > 0.96, name='model-upload-condition'):
+            custom_predict_op = create_custom_predict(project     = project,
+                                                      location    = location,
+                                                      name_bucket = name_bucket,
+                                                      labels      = labels)\
+            .set_cpu_limit('1')\
+            .set_memory_limit('4G')\
+            .set_display_name('Create Custom Predict Image')
+
+            upload_model_op = upload_to_model_registry(project                     = project,
+                                                       location                    = location,
+                                                       name_bucket                 = name_bucket,
+                                                       path_bucket                 = path_bucket,
+                                                       model_name                  = model_name,
+                                                       serving_container_image_uri = custom_predict_op.outputs["Output"],
+                                                       input_model                 = train_model_op.outputs['model'],
+                                                       description                 = model_description,
+                                                       labels                      = labels)\
+            .set_cpu_limit('1')\
+            .set_memory_limit('4G')\
+            .set_display_name('Save Model')
+
+            # deploy_model_endpoint_op = deploy_model_endpoint(project         = project,
+            #                                              location        = location,
+            #                                              model_name      = model_name,
+            #                                              model_id        = upload_model_op.outputs["Output"],
+            #                                              machine_type    = 'n1-standard-2',
+            #                                              labels          = labels)\
+            # .set_cpu_limit('4')\
+            # .set_memory_limit('8G')\
+            # .set_display_name('Deploy model in an endpoint')
 
 ###################################################################################
 #================================= COMPILE & RUN =================================#

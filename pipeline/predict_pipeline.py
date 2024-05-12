@@ -6,6 +6,7 @@ from google.cloud import storage
 from google.cloud import aiplatform
 from datetime import datetime
 from google.oauth2.service_account import Credentials
+from google_cloud_pipeline_components.v1.vertex_notification_email import VertexNotificationEmailOp
 
 ########################################################################################
 #=========================  Get VARIABLES & BASE_IMAGE   ==============================#
@@ -30,6 +31,8 @@ DISPLAY_NAME      = config["PIPELINE_METADATA"]["key"]+"-"+config["PIPELINE_META
 OUTPUT_BQ_PROJECT = config["OUTPUT_PROJECT_ID"]
 OUTPUT_BQ_DATASET = config["OUTPUT_DATASET_ID"]
 OUTPUT_BQ_TABLE   = config["OUTPUT_TABLE_ID"]
+
+PIPELINE_CRON     = config["PIPELINE_CRON"]
 
 file        = open('pipeline/prod_config.json')
 PROD_CONFIG = json.load(file)
@@ -193,37 +196,41 @@ def predict_pipeline(project           : str,
                      output_bq_dataset : str,
                      output_bq_table   : str):
     
-    get_data_op = get_data(name_bucket       = name_bucket,
-                          path_bucket       = path_bucket)\
-    .set_cpu_limit('1')\
-    .set_memory_limit('4G')\
-    .set_display_name('Get Data')
+    notify_email_task = VertexNotificationEmailOp(recipients=config['PIPELINE_ALERT_MAILS'])
 
-    batch_predict_op = batch_predict(project           = project,
-                                     location          = location,
-                                     name_bucket       = name_bucket,
-                                     path_bucket       = path_bucket,
-                                     labels            = labels,
-                                     prod_config       = prod_config,
-                                     model_name        = model_name,
-                                     features          = get_data_op.outputs["features"],
-                                     target            = get_data_op.outputs["target"],
-                                     train_data_path   = get_data_op.outputs["train_data_path"],
-                                     data_input        = get_data_op.outputs['dataset'])\
-    .set_cpu_limit('1')\
-    .set_memory_limit('4G')\
-    .set_display_name('Batch predictions')
+    with dsl.ExitHandler(notify_email_task):
     
-    
-    save_stats_op = save_stats(project          = project,
-                               location         = location,
-                               name_bucket      = name_bucket,
-                               path_bucket      = path_bucket,
-                               labels           = labels,
-                               job_name         = batch_predict_op.outputs["job_name"])\
-    .set_cpu_limit('1')\
-    .set_memory_limit('4G')\
-    .set_display_name('Save Stats Predictions')
+        get_data_op = get_data(name_bucket       = name_bucket,
+                              path_bucket       = path_bucket)\
+        .set_cpu_limit('1')\
+        .set_memory_limit('4G')\
+        .set_display_name('Get Data')
+
+        batch_predict_op = batch_predict(project           = project,
+                                         location          = location,
+                                         name_bucket       = name_bucket,
+                                         path_bucket       = path_bucket,
+                                         labels            = labels,
+                                         prod_config       = prod_config,
+                                         model_name        = model_name,
+                                         features          = get_data_op.outputs["features"],
+                                         target            = get_data_op.outputs["target"],
+                                         train_data_path   = get_data_op.outputs["train_data_path"],
+                                         data_input        = get_data_op.outputs['dataset'])\
+        .set_cpu_limit('1')\
+        .set_memory_limit('4G')\
+        .set_display_name('Batch predictions')
+
+
+        save_stats_op = save_stats(project          = project,
+                                   location         = location,
+                                   name_bucket      = name_bucket,
+                                   path_bucket      = path_bucket,
+                                   labels           = labels,
+                                   job_name         = batch_predict_op.outputs["job_name"])\
+        .set_cpu_limit('1')\
+        .set_memory_limit('4G')\
+        .set_display_name('Save Stats Predictions')
     
 
 ###################################################################################
@@ -247,7 +254,8 @@ def compile_pipeline(path_bucket       : str = PATH_BUCKET,
     
     return f"-- OK: COMPILE -- | PATH: {path_bucket+'/'+compile_name_file}"
 
-def run_pipeline(project           : str = PROJECT,
+def run_pipeline(scheduled         : bool = False,
+                 project           : str = PROJECT,
                  location          : str = REGION,
                  labels            : Dict = LABELS,
                  prod_config       : Dict = PROD_CONFIG,
@@ -258,7 +266,11 @@ def run_pipeline(project           : str = PROJECT,
                  display_name      : str = DISPLAY_NAME,
                  output_bq_project : str = OUTPUT_BQ_PROJECT,
                  output_bq_dataset : str = OUTPUT_BQ_DATASET,
-                 output_bq_table   : str = OUTPUT_BQ_TABLE) -> str:
+                 output_bq_table   : str = OUTPUT_BQ_TABLE,
+                 pipeline_cron     : str = PIPELINE_CRON) -> str:
+    
+    aiplatform.init(project  = project, 
+                    location = location)
     
     ### Parameters for pipeline job
     pipeline_parameters = dict(model_name        = model_name,
@@ -272,15 +284,32 @@ def run_pipeline(project           : str = PROJECT,
                                output_bq_dataset = output_bq_dataset,
                                output_bq_table   = output_bq_table)
     
-    start_pipeline = aiplatform.PipelineJob(display_name     = list(labels.values())[0],
-                                            template_path    = 'gs://'+name_bucket+'/'+path_bucket+'/'+compile_name_file,
-                                            pipeline_root    = 'gs://'+name_bucket+'/'+path_bucket,
-                                            job_id           = display_name,
-                                            labels           = labels,
-                                            enable_caching   = False,
-                                            location         = location,
-                                            parameter_values = pipeline_parameters)
-    
-    start_pipeline.submit()
+    if scheduled:
+        start_pipeline = aiplatform.PipelineJob(display_name     = list(labels.values())[0],
+                                                template_path    = 'gs://'+name_bucket+'/'+path_bucket+'/'+compile_name_file,
+                                                pipeline_root    = 'gs://'+name_bucket+'/'+path_bucket,
+                                                job_id           = display_name,
+                                                labels           = labels,
+                                                enable_caching   = False,
+                                                location         = location,
+                                                parameter_values = pipeline_parameters)
+
+        # Schedule pipeline
+        start_pipeline.create_schedule(cron                   = pipeline_cron,
+                                       display_name           = list(labels.values())[0],
+                                       create_request_timeout = 40*60)
+    else:
+        TIMESTAMP = datetime.now().strftime("%Y%m%d%H%M%S")
+        start_pipeline = aiplatform.PipelineJob(display_name     = list(labels.values())[0] + str(TIMESTAMP),
+                                                template_path    = 'gs://'+name_bucket+'/'+path_bucket+'/'+compile_name_file,
+                                                pipeline_root    = 'gs://'+name_bucket+'/'+path_bucket,
+                                                job_id           = display_name,
+                                                labels           = labels,
+                                                enable_caching   = False,
+                                                location         = location,
+                                                parameter_values = pipeline_parameters)
+
+        # Start pipeline
+        start_pipeline.submit()
     
     return '-- OK RUN --'

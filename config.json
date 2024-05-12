@@ -3,11 +3,12 @@
     "PIPELINE_REGION"              : "us-east4",
     "PIPELINE_METADATA"            : {"key":"mlops",
                                       "value":"mle-template"},
-    
+    "PIPELINE_CRON"                : "TZ=America/Lima 30 11 3 * *",
     "PIPELINE_NAME_BUCKET"         : "my-bucket-dmc",
     "PIPELINE_PATH_BUCKET"         : "mlops-test",
     "PIPELINE_MODEL_NAMES"         : "iris-model",
     "PIPELINE_MODEL_DESCRIPTION"   : "Modelo plantilla MLOps",
+    "PIPELINE_ALERT_MAILS"         : ["enriquemejiagamarra@gmail.com"],
     
     "OUTPUT_PROJECT_ID"            : "astral-reef-391421",
     "OUTPUT_DATASET_ID"            : "Mlops",
