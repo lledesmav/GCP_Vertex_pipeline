@@ -20,7 +20,7 @@ def predict_pipeline():
     return 'Ejecución Correcta!'
 
 @app.route("/on_demand_predict_pipeline")
-def predict_pipeline():
+def on_demand_predict_pipeline():
     from pipeline.predict_pipeline import compile_pipeline, run_pipeline
     compile_pipeline()
     run_pipeline(scheduled=False)
