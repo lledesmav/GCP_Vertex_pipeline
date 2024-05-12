@@ -36,16 +36,24 @@ steps:
       - '--platform=managed'
       - '--allow-unauthenticated'
 
-  # Step 4: Get and use the URL of the deployed Cloud Run service
+  # Step 4: Check status and use the URL of the deployed Cloud Run service
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'sh'
     args:
       - '-c'
       - |
         set -e  # Stop execution on any error
-        curl "$(gcloud run services describe $_CLOUD_RUN_SERVICE --region=$_REGION --platform=managed --format='value(status.url)')/train_pipeline"
-        curl "$(gcloud run services describe $_CLOUD_RUN_SERVICE --region=$_REGION --platform=managed --format='value(status.url)')/predict_pipeline"
-        
+        # Check service status
+        STATUS=$(gcloud run services describe $_CLOUD_RUN_SERVICE --region=$_REGION --platform=managed --format='value(status.conditions[0].status)')
+        while [ "$STATUS" != "True" ]; do
+          echo "Waiting for service to become stable..."
+          sleep 10
+          STATUS=$(gcloud run services describe $_CLOUD_RUN_SERVICE --region=$_REGION --platform=managed --format='value(status.conditions[0].status)')
+        done
+        URL=$(gcloud run services describe $_CLOUD_RUN_SERVICE --region=$_REGION --platform=managed --format='value(status.url)')
+        echo "Service is stable and running at $URL"
+        curl "$URL/$_PIPELINE_TYPE"
+
 substitutions:
   _PROJECT_ID: 'astral-reef-391421'
   _REGION: 'us-central1'
