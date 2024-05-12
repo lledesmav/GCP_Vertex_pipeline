@@ -1,8 +1,6 @@
 {
-    "PROJECT_KEY_PATH"             : "key/credentials.json",
-    
     "PIPELINE_PROJECT_ID"          : "astral-reef-391421",
-    "PIPELINE_REGION"              : "us-central1",
+    "PIPELINE_REGION"              : "us-east4",
     "PIPELINE_METADATA"            : {"key":"mlops",
                                       "value":"mle-template"},
     

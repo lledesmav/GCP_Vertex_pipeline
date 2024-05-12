@@ -1,7 +1,6 @@
 # PIPELINE DEFINITION
 # Name: mlops-mle-template
 # Inputs:
-#    credential_path: str
 #    labels: dict
 #    location: str
 #    model_description: str
@@ -23,8 +22,6 @@ components:
             name: comp-create-custom-predict
           inputs:
             parameters:
-              credential_path:
-                componentInputParameter: pipelinechannel--credential_path
               labels:
                 componentInputParameter: pipelinechannel--labels
               location:
@@ -47,8 +44,6 @@ components:
               input_model:
                 componentInputArtifact: pipelinechannel--train-model-model
             parameters:
-              credential_path:
-                componentInputParameter: pipelinechannel--credential_path
               description:
                 componentInputParameter: pipelinechannel--model_description
               labels:
@@ -57,6 +52,10 @@ components:
                 componentInputParameter: pipelinechannel--location
               model_name:
                 componentInputParameter: pipelinechannel--model_name
+              name_bucket:
+                componentInputParameter: pipelinechannel--name_bucket
+              path_bucket:
+                componentInputParameter: pipelinechannel--path_bucket
               project:
                 componentInputParameter: pipelinechannel--project
               serving_container_image_uri:
@@ -72,8 +71,6 @@ components:
             schemaTitle: system.Model
             schemaVersion: 0.0.1
       parameters:
-        pipelinechannel--credential_path:
-          parameterType: STRING
         pipelinechannel--labels:
           parameterType: STRUCT
         pipelinechannel--location:
@@ -84,6 +81,8 @@ components:
           parameterType: STRING
         pipelinechannel--name_bucket:
           parameterType: STRING
+        pipelinechannel--path_bucket:
+          parameterType: STRING
         pipelinechannel--project:
           parameterType: STRING
         pipelinechannel--testing-model-Output:
@@ -92,8 +91,6 @@ components:
     executorLabel: exec-create-custom-predict
     inputDefinitions:
       parameters:
-        credential_path:
-          parameterType: STRING
         labels:
           parameterType: STRUCT
         location:
@@ -108,10 +105,6 @@ components:
           parameterType: STRING
   comp-get-data:
     executorLabel: exec-get-data
-    inputDefinitions:
-      parameters:
-        credential_path:
-          parameterType: STRING
     outputDefinitions:
       artifacts:
         dataset:
@@ -126,9 +119,6 @@ components:
           artifactType:
             schemaTitle: system.Dataset
             schemaVersion: 0.0.1
-      parameters:
-        credential_path:
-          parameterType: STRING
     outputDefinitions:
       artifacts:
         data_test:
@@ -155,9 +145,6 @@ components:
           artifactType:
             schemaTitle: system.Model
             schemaVersion: 0.0.1
-      parameters:
-        credential_path:
-          parameterType: STRING
     outputDefinitions:
       artifacts:
         metrics:
@@ -180,8 +167,6 @@ components:
             schemaTitle: system.Model
             schemaVersion: 0.0.1
       parameters:
-        credential_path:
-          parameterType: STRING
         name_bucket:
           parameterType: STRING
         path_bucket:
@@ -204,22 +189,36 @@ components:
           artifactType:
             schemaTitle: system.Model
             schemaVersion: 0.0.1
+          description: The trained model to be uploaded.
       parameters:
-        credential_path:
-          parameterType: STRING
+        credential_dict:
+          description: A dictionary containing the service account credentials.
+          isOptional: true
+          parameterType: STRUCT
         description:
+          description: A description for the uploaded model. Defaults to None.
           isOptional: true
           parameterType: STRING
         labels:
+          description: A dictionary containing labels for the uploaded model. Defaults
+            to None.
           isOptional: true
           parameterType: STRUCT
         location:
+          description: The region for the Google Cloud Project.
           parameterType: STRING
         model_name:
+          description: The name for the model in the model registry.
+          parameterType: STRING
+        name_bucket:
+          parameterType: STRING
+        path_bucket:
           parameterType: STRING
         project:
+          description: The Google Cloud Project ID.
           parameterType: STRING
         serving_container_image_uri:
+          description: The URI of the serving container image.
           parameterType: STRING
     outputDefinitions:
       parameters:
@@ -239,9 +238,9 @@ deploymentSpec:
         - -c
         - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
           \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
-          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.6.0'\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.7.0'\
           \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
-          \  python3 -m pip install --quiet --no-warn-script-location 'google-cloud-aiplatform[prediction]==1.31.0'\
+          \  python3 -m pip install --quiet --no-warn-script-location 'google-cloud-aiplatform[prediction]==1.33.1'\
           \ && \"$0\" \"$@\"\n"
         - sh
         - -ec
@@ -254,23 +253,22 @@ deploymentSpec:
 
           '
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
-          \ *\n\ndef create_custom_predict(credential_path : str,\n              \
-          \            project         : str,\n                          location\
-          \        : str,\n                          name_bucket     : str,\n    \
-          \                      labels          : Dict)-> str:\n    #==== Define\
-          \ credentials ====#\n    import os\n    os.environ['GOOGLE_APPLICATION_CREDENTIALS']\
-          \ = credential_path\n    os.environ['GOOGLE_CLOUD_PROJECT'] = project\n\n\
-          \    #==== Define BASE_IMAGE ====#\n    repo_name  = list(labels.values())[0]\n\
-          \    container  = repo_name+'-cust-pred'\n    BASE_IMAGE = '{}-docker.pkg.dev/{}/{}/{}:latest'.format(location,\
-          \ project, repo_name, container)\n\n    #==== Build the Custom Predict Routine\
-          \ ====#\n    from pipeline.prod_modules import build_custom_predict_routine_image\n\
-          \    out, err = build_custom_predict_routine_image(BASE_IMAGE          \
-          \   = BASE_IMAGE,\n                                                  CUST_PRED_ROUTINE_PATH\
+          \ *\n\ndef create_custom_predict(project         : str,\n              \
+          \            location        : str,\n                          name_bucket\
+          \     : str,\n                          labels          : Dict)-> str:\n\
+          \n    #==== Define BASE_IMAGE ====#\n    repo_name  = 'repo-'+list(labels.values())[0]\n\
+          \    container  = list(labels.values())[0]+'-cust-pred'\n    BASE_IMAGE\
+          \ = '{}-docker.pkg.dev/{}/{}/{}:latest'.format(location, project, repo_name,\
+          \ container)\n\n    #==== Build the Custom Predict Routine ====#\n    from\
+          \ pipeline.prod_modules import build_custom_predict_routine_image\n    out,\
+          \ err = build_custom_predict_routine_image(BASE_IMAGE             = BASE_IMAGE,\n\
+          \                                                  CUST_PRED_ROUTINE_PATH\
           \ = \"pipeline/custom_prediction\",\n                                  \
-          \                NAME_BUCKET            = name_bucket)\n\n    print('El\
-          \ out es: ' + str(out))\n    print('El err es: ' + str(err))\n\n    return\
-          \ BASE_IMAGE\n\n"
-        image: us-central1-docker.pkg.dev/astral-reef-391421/mle-template/mle-template:latest
+          \                PROJECT_ID             = project,\n                   \
+          \                               NAME_BUCKET            = name_bucket)\n\n\
+          \    print('El out es: ' + str(out))\n    print('El err es: ' + str(err))\n\
+          \n    return BASE_IMAGE\n\n"
+        image: us-east4-docker.pkg.dev/astral-reef-391421/repo-mle-template/mle-template:latest
         resources:
           cpuLimit: 1.0
           memoryLimit: 4.0
@@ -286,7 +284,7 @@ deploymentSpec:
         - -c
         - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
           \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
-          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.6.0'\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.7.0'\
           \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
           $0\" \"$@\"\n"
         - sh
@@ -300,22 +298,20 @@ deploymentSpec:
 
           '
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
-          \ *\n\ndef get_data(credential_path : str,\n             dataset       \
-          \  : OutputPath(\"Dataset\")):\n\n    #==== Define credentials ====#\n \
-          \   import os\n    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credential_path\n\
-          \n    #==== Importing necessary libraries ====#\n    import pandas as pd\n\
-          \    from sklearn.datasets import load_iris\n\n    #==== Loading the Iris\
-          \ dataset ====#\n    iris = load_iris()\n    data = pd.DataFrame(data=iris['data'],\
-          \ columns=iris['feature_names'])\n    data['target'] = iris['target']\n\n\
-          \    # Define a mapping dictionary for the columns\n    column_mapping =\
-          \ {\n        'sepal length (cm)': 'sepal_length_cm',\n        'sepal width\
-          \ (cm)': 'sepal_width_cm',\n        'petal length (cm)': 'petal_length_cm',\n\
-          \        'petal width (cm)': 'petal_width_cm',\n    }\n\n    # Rename the\
-          \ columns using the mapping\n    data.rename(columns=column_mapping, inplace=True)\n\
-          \n    #==== Save the df in GCS ====#\n    from CustomLib.gcp import cloudstorage\n\
-          \    cloudstorage.write_csv(df       = data, \n                        \
-          \   gcs_path = dataset + '.csv')\n\n"
-        image: us-central1-docker.pkg.dev/astral-reef-391421/mle-template/mle-template:latest
+          \ *\n\ndef get_data(dataset : OutputPath(\"Dataset\")):\n\n    #==== Importing\
+          \ necessary libraries ====#\n    import pandas as pd\n    from sklearn.datasets\
+          \ import load_iris\n\n    #==== Loading the Iris dataset ====#\n    iris\
+          \ = load_iris()\n    data = pd.DataFrame(data=iris['data'], columns=iris['feature_names'])\n\
+          \    data['target'] = iris['target']\n\n    # Define a mapping dictionary\
+          \ for the columns\n    column_mapping = {\n        'sepal length (cm)':\
+          \ 'sepal_length_cm',\n        'sepal width (cm)': 'sepal_width_cm',\n  \
+          \      'petal length (cm)': 'petal_length_cm',\n        'petal width (cm)':\
+          \ 'petal_width_cm',\n    }\n\n    # Rename the columns using the mapping\n\
+          \    data.rename(columns=column_mapping, inplace=True)\n\n    #==== Save\
+          \ the df in GCS ====#\n    from CustomLib.gcp import cloudstorage\n    cloudstorage.write_csv(df\
+          \       = data, \n                           gcs_path = dataset + '.csv')\n\
+          \n"
+        image: us-east4-docker.pkg.dev/astral-reef-391421/repo-mle-template/mle-template:latest
         resources:
           cpuLimit: 1.0
           memoryLimit: 4.0
@@ -331,7 +327,7 @@ deploymentSpec:
         - -c
         - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
           \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
-          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.6.0'\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.7.0'\
           \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
           $0\" \"$@\"\n"
         - sh
@@ -345,15 +341,13 @@ deploymentSpec:
 
           '
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
-          \ *\n\ndef split_data(credential_path : str,\n               data_input\
-          \      : InputPath(\"Dataset\"),\n               scaler          : Output[Model],\n\
-          \               data_train      : OutputPath(\"Dataset\"),\n           \
-          \    data_test       : OutputPath(\"Dataset\"),):\n\n    #==== Define credentials\
-          \ ====#\n    import os\n    os.environ['GOOGLE_APPLICATION_CREDENTIALS']\
-          \ = credential_path\n\n    #==== Read input data from GCS ====#\n    from\
-          \ CustomLib.gcp import cloudstorage\n    data = cloudstorage.read_csv_as_df(gcs_path\
-          \ = data_input + '.csv')\n\n    #==== Preprocessing the data ====#\n   \
-          \ from src.utils import preprocess_data\n    train_df, test_df, scaler_model\
+          \ *\n\ndef split_data(data_input      : InputPath(\"Dataset\"),\n      \
+          \         scaler          : Output[Model],\n               data_train  \
+          \    : OutputPath(\"Dataset\"),\n               data_test       : OutputPath(\"\
+          Dataset\"),):\n\n    #==== Read input data from GCS ====#\n    from CustomLib.gcp\
+          \ import cloudstorage\n    data = cloudstorage.read_csv_as_df(gcs_path =\
+          \ data_input + '.csv')\n\n    #==== Preprocessing the data ====#\n    from\
+          \ src.utils import preprocess_data\n    train_df, test_df, scaler_model\
           \ = preprocess_data(data)\n\n    #==== Save the df in GCS ====#\n    cloudstorage.write_csv(df\
           \       = train_df, \n                           gcs_path = data_train +\
           \ '.csv')\n    cloudstorage.write_csv(df       = test_df, \n           \
@@ -361,7 +355,7 @@ deploymentSpec:
           \ in GCS ====#\n    cloudstorage.write_pickle(model    = scaler_model, \n\
           \                              gcs_path = scaler.path + '/scaler.pkl')\n\
           \n"
-        image: us-central1-docker.pkg.dev/astral-reef-391421/mle-template/mle-template:latest
+        image: us-east4-docker.pkg.dev/astral-reef-391421/repo-mle-template/mle-template:latest
         resources:
           cpuLimit: 1.0
           memoryLimit: 4.0
@@ -377,7 +371,7 @@ deploymentSpec:
         - -c
         - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
           \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
-          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.6.0'\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.7.0'\
           \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
           $0\" \"$@\"\n"
         - sh
@@ -391,12 +385,10 @@ deploymentSpec:
 
           '
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
-          \ *\n\ndef testing_model(credential_path : str,\n                   model\
-          \           : Input[Model],\n                   data_test       : InputPath(\"\
-          Dataset\"),\n                   metrics         : Output[Metrics])->float:\n\
-          \n    #==== Define credentials ====#\n    import os\n    os.environ['GOOGLE_APPLICATION_CREDENTIALS']\
-          \ = credential_path\n\n    #==== Read test data from GCS ====#\n    from\
-          \ CustomLib.gcp import cloudstorage\n    test_df = cloudstorage.read_csv_as_df(gcs_path\
+          \ *\n\ndef testing_model(model           : Input[Model],\n             \
+          \     data_test       : InputPath(\"Dataset\"),\n                  metrics\
+          \         : Output[Metrics])->float:\n\n    #==== Read test data from GCS\
+          \ ====#\n    from CustomLib.gcp import cloudstorage\n    test_df = cloudstorage.read_csv_as_df(gcs_path\
           \ = data_test + '.csv')\n\n    #==== Read model artifact ====#\n    model\
           \ = cloudstorage.read_pickle(gcs_path = model.path + '/model.pkl')\n\n \
           \   #==== Evaluating the model ====#\n    X_test = test_df.drop(columns=['target'])\n\
@@ -405,7 +397,7 @@ deploymentSpec:
           \    logs, conf_matrix = get_metrics(y_test, predictions)\n\n    for metric,value\
           \ in logs.items():\n        metrics.log_metric(metric, value)\n\n    return\
           \ logs['f1']\n\n"
-        image: us-central1-docker.pkg.dev/astral-reef-391421/mle-template/mle-template:latest
+        image: us-east4-docker.pkg.dev/astral-reef-391421/repo-mle-template/mle-template:latest
         resources:
           cpuLimit: 1.0
           memoryLimit: 4.0
@@ -421,7 +413,7 @@ deploymentSpec:
         - -c
         - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
           \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
-          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.6.0'\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.7.0'\
           \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
           $0\" \"$@\"\n"
         - sh
@@ -435,12 +427,10 @@ deploymentSpec:
 
           '
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
-          \ *\n\ndef train_model(credential_path : str,\n                name_bucket\
-          \     : str,\n                path_bucket     : str,\n                data_train\
-          \      : InputPath(\"Dataset\"),\n                scaler          : Input[Model],\n\
-          \                model           : Output[Model],\n                metrics\
-          \         : Output[Metrics]):\n\n    #==== Define credentials ====#\n  \
-          \  import os\n    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credential_path\n\
+          \ *\n\ndef train_model(name_bucket     : str,\n                path_bucket\
+          \     : str,\n                data_train      : InputPath(\"Dataset\"),\n\
+          \                scaler          : Input[Model],\n                model\
+          \           : Output[Model],\n                metrics         : Output[Metrics]):\n\
           \n    #==== Read train data from GCS ====#\n    from CustomLib.gcp import\
           \ cloudstorage\n    train_df = cloudstorage.read_csv_as_df(gcs_path = data_train\
           \ + '.csv')\n\n    #==== Save train data for monitoring ====#\n    file_name\
@@ -461,7 +451,7 @@ deploymentSpec:
           \ \n                              gcs_path = model.path + '/model.pkl')\n\
           \    cloudstorage.write_pickle(model    = scaler, \n                   \
           \           gcs_path = model.path + '/scaler.pkl')\n\n"
-        image: us-central1-docker.pkg.dev/astral-reef-391421/mle-template/mle-template:latest
+        image: us-east4-docker.pkg.dev/astral-reef-391421/repo-mle-template/mle-template:latest
         resources:
           cpuLimit: 1.0
           memoryLimit: 4.0
@@ -477,9 +467,9 @@ deploymentSpec:
         - -c
         - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
           \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
-          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.6.0'\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.7.0'\
           \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
-          \  python3 -m pip install --quiet --no-warn-script-location 'google-cloud-aiplatform==1.31.0'\
+          \  python3 -m pip install --quiet --no-warn-script-location 'google-cloud-aiplatform==1.29.0'\
           \ 'google-auth==2.17.3' 'google-auth-oauthlib==0.4.6' 'google-auth-httplib2==0.1.0'\
           \ 'google-api-python-client==1.8.0' && \"$0\" \"$@\"\n"
         - sh
@@ -495,42 +485,55 @@ deploymentSpec:
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
           \ *\n\ndef upload_to_model_registry(project                     : str,\n\
           \                             location                    : str,\n     \
-          \                        model_name                  : str,\n          \
-          \                   serving_container_image_uri : str,\n               \
-          \              credential_path             : str,\n                    \
-          \         input_model                 : Input[Model],\n                \
-          \             description                 : str  = None,\n             \
-          \                labels                      : Dict = None,)->str:\n   \
-          \ import time\n    # Sleep for 600 seconds (10 minutes)\n    time.sleep(600)\n\
-          \n    #=== Get the correct artifact_uri for the model ===#\n    artifact_uri\
-          \ = input_model.path+'/'\n    print('El artifact uri es: '+str(artifact_uri))\n\
+          \                        name_bucket                 : str,\n          \
+          \                   path_bucket                 : str,\n               \
+          \              model_name                  : str,\n                    \
+          \         serving_container_image_uri : str,\n                         \
+          \    input_model                 : Input[Model],\n                     \
+          \        credential_dict             : Dict = None,\n                  \
+          \           description                 : str  = None,\n               \
+          \              labels                      : Dict = None,)->str:\n    \"\
+          \"\"\n    Upload a trained model to the Google Cloud AI Platform's Model\
+          \ Registry, creates a version of the model, and returns the uploaded model's\
+          \ name.\n\n    Args:\n        project (str)                     : The Google\
+          \ Cloud Project ID.\n        location (str)                    : The region\
+          \ for the Google Cloud Project.\n        model_name (str)              \
+          \    : The name for the model in the model registry.\n        serving_container_image_uri\
+          \ (str) : The URI of the serving container image.\n        description (str,\
+          \ optional)       : A description for the uploaded model. Defaults to None.\n\
+          \        labels (Dict, optional)           : A dictionary containing labels\
+          \ for the uploaded model. Defaults to None.\n        credential_dict (Dict)\
+          \            : A dictionary containing the service account credentials.\n\
+          \        input_model (Input[Model])        : The trained model to be uploaded.\n\
+          \n    Returns:\n        (str): The name of the uploaded model in the Google\
+          \ Cloud AI Platform's Model Registry.\n    \"\"\"\n    #=== Get the correct\
+          \ artifact_uri for the model ===#\n    artifact_uri = input_model.path+'/'\n\
           \n    #=== Generate a timestamp ===#\n    from datetime import datetime\n\
           \    timestamp =datetime.now().strftime(\"%Y%m%d%H%M%S\")\n\n    #=== Initialize\
-          \ the aiplatform with the credentials ===#\n    import os\n    os.environ['GOOGLE_APPLICATION_CREDENTIALS']\
-          \ = credential_path\n\n    from google.oauth2.service_account import Credentials\n\
-          \    credentials = Credentials.from_service_account_file(credential_path)\n\
-          \n    from google.cloud import aiplatform\n    aiplatform.init(project \
-          \ = project, \n                    location  = location,\n             \
-          \       credentials=credentials)\n\n    #=== Check if exist a previous version\
-          \ of the model ===#\n    model_list=aiplatform.Model.list(filter = 'display_name=\"\
-          {}\"'.format(model_name))\n    if len(model_list)>0:\n        parent_model_name\
-          \ = model_list[0].name\n    else:\n        parent_model_name = None\n\n\
-          \    print('El URI es: '+ input_model.path.replace(\"/gcs/\", \"gs://\"\
-          , 1)+'/model_registry')\n\n    #=== Upload the model to Model Registry ===#\n\
-          \    model = aiplatform.Model.upload(display_name                    = model_name,\n\
-          \                                    artifact_uri                    = artifact_uri,\n\
-          \                                    parent_model                    = parent_model_name,\n\
+          \ the aiplatform with the credentials ===#\n    from google.cloud import\
+          \ aiplatform\n    from google.oauth2 import service_account\n    from google.auth\
+          \ import default\n\n    if credential_dict:\n        # Initialize AI Platform\
+          \ with service account credentials from dict\n        credentials = service_account.Credentials.from_service_account_info(credential_dict)\n\
+          \    else:\n        # Use default credentials\n        credentials, _ =\
+          \ default()\n\n    aiplatform.init(project=project, location=location, credentials=credentials)\n\
+          \n    #=== Check if exist a previous version of the model ===#\n    model_list=aiplatform.Model.list(filter\
+          \ = 'display_name=\"{}\"'.format(model_name))\n    if len(model_list)>0:\n\
+          \        parent_model_name = model_list[0].name\n    else:\n        parent_model_name\
+          \ = None\n\n    staging_bucket = f\"gs://{name_bucket}/{path_bucket}/model-registry/{model_name}-{timestamp}\"\
+          \n    #=== Upload the model to Model Registry ===#\n    model = aiplatform.Model.upload(display_name\
+          \                    = model_name,\n                                   \
+          \ artifact_uri                    = artifact_uri,\n                    \
+          \                parent_model                    = parent_model_name,\n\
           \                                    description                     = description,\n\
           \                                    labels                          = labels,\n\
           \                                    serving_container_image_uri     = serving_container_image_uri,\n\
           \                                    version_aliases                 = [model_name+'-'+timestamp],\
-          \  \n                                    staging_bucket                \
-          \  = input_model.path.replace(\"/gcs/\", \"gs://\", 1)+'/model_registry',\n\
-          \                                    serving_container_health_route  = \"\
-          /v1/models\",\n                                    serving_container_predict_route\
-          \ = \"/v1/models/predict\")\n\n    model.wait()\n\n    return model.name\n\
-          \n"
-        image: us-central1-docker.pkg.dev/astral-reef-391421/mle-template/mle-template:latest
+          \        \n                                    serving_container_health_route\
+          \  = \"/v1/models\",\n                                    serving_container_predict_route\
+          \ = \"/v1/models/predict\",\n                                    staging_bucket\
+          \                  = staging_bucket)\n\n    model.wait()\n\n    import time\n\
+          \    time.sleep(300)\n\n    return model.name\n\n"
+        image: python:3.9
         resources:
           cpuLimit: 1.0
           memoryLimit: 4.0
@@ -562,8 +565,6 @@ root:
                 outputArtifactKey: model
                 producerTask: train-model
           parameters:
-            pipelinechannel--credential_path:
-              componentInputParameter: credential_path
             pipelinechannel--labels:
               componentInputParameter: labels
             pipelinechannel--location:
@@ -574,6 +575,8 @@ root:
               componentInputParameter: model_name
             pipelinechannel--name_bucket:
               componentInputParameter: name_bucket
+            pipelinechannel--path_bucket:
+              componentInputParameter: path_bucket
             pipelinechannel--project:
               componentInputParameter: project
             pipelinechannel--testing-model-Output:
@@ -590,10 +593,6 @@ root:
           enableCache: true
         componentRef:
           name: comp-get-data
-        inputs:
-          parameters:
-            credential_path:
-              componentInputParameter: credential_path
         taskInfo:
           name: Get Data
       split-data:
@@ -609,9 +608,6 @@ root:
               taskOutputArtifact:
                 outputArtifactKey: dataset
                 producerTask: get-data
-          parameters:
-            credential_path:
-              componentInputParameter: credential_path
         taskInfo:
           name: Split Data
       testing-model:
@@ -632,9 +628,6 @@ root:
               taskOutputArtifact:
                 outputArtifactKey: model
                 producerTask: train-model
-          parameters:
-            credential_path:
-              componentInputParameter: credential_path
         taskInfo:
           name: Testing Model
       train-model:
@@ -655,8 +648,6 @@ root:
                 outputArtifactKey: scaler
                 producerTask: split-data
           parameters:
-            credential_path:
-              componentInputParameter: credential_path
             name_bucket:
               componentInputParameter: name_bucket
             path_bucket:
@@ -665,8 +656,6 @@ root:
           name: Train Model
   inputDefinitions:
     parameters:
-      credential_path:
-        parameterType: STRING
       labels:
         parameterType: STRUCT
       location:
@@ -692,4 +681,4 @@ root:
           schemaTitle: system.Metrics
           schemaVersion: 0.0.1
 schemaVersion: 2.1.0
-sdkVersion: kfp-2.6.0
+sdkVersion: kfp-2.7.0

@@ -1,0 +1,371 @@
+# PIPELINE DEFINITION
+# Name: mlops-mle-template
+# Inputs:
+#    labels: dict
+#    location: str
+#    model_name: str
+#    name_bucket: str
+#    output_bq_dataset: str
+#    output_bq_project: str
+#    output_bq_table: str
+#    path_bucket: str
+#    prod_config: dict
+#    project: str
+components:
+  comp-batch-predict:
+    executorLabel: exec-batch-predict
+    inputDefinitions:
+      artifacts:
+        data_input:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+      parameters:
+        features:
+          parameterType: LIST
+        labels:
+          parameterType: STRUCT
+        location:
+          parameterType: STRING
+        model_name:
+          parameterType: STRING
+        name_bucket:
+          parameterType: STRING
+        path_bucket:
+          parameterType: STRING
+        prod_config:
+          parameterType: STRUCT
+        project:
+          parameterType: STRING
+        target:
+          parameterType: STRING
+        train_data_path:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        data_output:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+      parameters:
+        job_name:
+          parameterType: STRING
+  comp-get-data:
+    executorLabel: exec-get-data
+    inputDefinitions:
+      parameters:
+        name_bucket:
+          parameterType: STRING
+        path_bucket:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+      parameters:
+        features:
+          parameterType: LIST
+        target:
+          parameterType: STRING
+        train_data_path:
+          parameterType: STRING
+  comp-save-stats:
+    executorLabel: exec-save-stats
+    inputDefinitions:
+      parameters:
+        job_name:
+          parameterType: STRING
+        labels:
+          parameterType: STRUCT
+        location:
+          parameterType: STRING
+        name_bucket:
+          parameterType: STRING
+        path_bucket:
+          parameterType: STRING
+        project:
+          parameterType: STRING
+deploymentSpec:
+  executors:
+    exec-batch-predict:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - batch_predict
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.7.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef batch_predict(project          : str,\n                  location\
+          \         : str,\n                  name_bucket      : str,\n          \
+          \        path_bucket      : str,\n                  labels           : Dict,\n\
+          \                  prod_config      : Dict,\n                  model_name\
+          \       : str,\n                  features         : list,\n           \
+          \       target           : str,\n                  train_data_path  : str,\n\
+          \                  data_input       : InputPath(\"Dataset\"), \n       \
+          \           data_output      : OutputPath(\"Dataset\")) -> NamedTuple(\"\
+          output\", [(\"job_name\", str)]):\n\n    #==== Read input data from GCS\
+          \ ====#\n    from CustomLib.gcp import cloudstorage\n    df = cloudstorage.read_csv_as_df(gcs_path\
+          \ = data_input + '.csv')\n\n    #==== Get the model ====#\n    from pipeline.prod_modules\
+          \ import get_model_by_display_name\n    model = get_model_by_display_name(display_name\
+          \ = model_name, \n                                      project      = project,\
+          \ \n                                      location     = location)\n\n \
+          \   #==== Generate batch predictions ====#\n    from pipeline.prod_modules\
+          \ import last_slash_detec, batch_prediction_request\n    df_to_predict,\
+          \ job_name = batch_prediction_request(project           = project,\n   \
+          \                                                    location          =\
+          \ location,\n                                                       model_name\
+          \        = model.name,\n                                               \
+          \        input_path        = last_slash_detec(data_input),\n           \
+          \                                            output_path       = last_slash_detec(data_output),\n\
+          \                                                       labels         \
+          \   = labels,\n                                                       prod_config\
+          \       = prod_config,\n                                               \
+          \        training_dataset  = train_data_path,\n                        \
+          \                               features          = features,\n        \
+          \                                               target            = target,\n\
+          \                                                       name_bucket    \
+          \   = name_bucket,\n                                                   \
+          \    path_bucket       = path_bucket,\n                                \
+          \                       df_to_predict     = df)\n\n    #==== Save predictions\
+          \ ====#\n    cloudstorage.write_csv(df       = df_to_predict, \n       \
+          \                    gcs_path = data_output +'.csv')\n\n    Output = NamedTuple(\"\
+          output\", [(\"job_name\", str)])  # Define the NamedTuple\n    result =\
+          \ Output(job_name=job_name)  # Create an instance with the job_name\n\n\
+          \    return result\n\n"
+        image: us-east4-docker.pkg.dev/astral-reef-391421/repo-mle-template/mle-template:latest
+        resources:
+          cpuLimit: 1.0
+          memoryLimit: 4.0
+    exec-get-data:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - get_data
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.7.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef get_data(name_bucket : str,\n             path_bucket : str,\n\
+          \             dataset         : OutputPath(\"Dataset\")) -> NamedTuple(\"\
+          output\", [(\"features\", list),(\"target\", str),(\"train_data_path\",str)]):\n\
+          \n    #==== Importing necessary libraries ====#\n    import pandas as pd\n\
+          \    from sklearn.datasets import load_iris\n\n    #==== Loading the Iris\
+          \ dataset ====#\n    iris = load_iris()\n    data = pd.DataFrame(data=iris['data'],\
+          \ columns=iris['feature_names'])\n    data['target'] = iris['target']\n\n\
+          \    # Define a mapping dictionary for the columns\n    column_mapping =\
+          \ {\n        'sepal length (cm)': 'sepal_length_cm',\n        'sepal width\
+          \ (cm)': 'sepal_width_cm',\n        'petal length (cm)': 'petal_length_cm',\n\
+          \        'petal width (cm)': 'petal_width_cm',\n    }\n\n    # Rename the\
+          \ columns using the mapping\n    data.rename(columns=column_mapping, inplace=True)\n\
+          \n    columns = list(data.columns)\n    features = columns[:-1]\n    target\
+          \ = columns[-1]\n\n    #==== Getting a random sample of 100 rows ====#\n\
+          \    # If the dataset contains fewer than 100 rows, this will return all\
+          \ rows in random order\n    random_sample = data.sample(n=min(100, len(data)),\
+          \ random_state=42) # The random_state ensures reproducibility\n    data\
+          \ = random_sample.drop(columns=['target'])\n\n    #==== Get the training_dataset\
+          \ ====#\n    from CustomLib.gcp import cloudstorage\n    gcs_path = f\"\
+          gs://{name_bucket}/{path_bucket}/last_training_path.txt\"\n    train_data_path\
+          \ = cloudstorage.read_txt_as_str(gcs_path=gcs_path)\n\n    #==== Save the\
+          \ df in GCS ====#\n    cloudstorage.write_csv(df       = data, \n      \
+          \                     gcs_path = dataset + '.csv')\n\n    return features,\
+          \ target, train_data_path\n\n"
+        image: us-east4-docker.pkg.dev/astral-reef-391421/repo-mle-template/mle-template:latest
+        resources:
+          cpuLimit: 1.0
+          memoryLimit: 4.0
+    exec-save-stats:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - save_stats
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.7.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef save_stats(project          : str,\n               location \
+          \        : str,\n               name_bucket      : str,\n              \
+          \ path_bucket      : str,\n               labels           : Dict,\n   \
+          \            job_name         : str):\n\n    # Move stats files in GCS\n\
+          \    from pipeline.prod_modules import move_stats_file, build_monitoring_prediction_image\n\
+          \    move_stats_file(job_name    = job_name, \n                    name_bucket\
+          \ = name_bucket, \n                    path_bucket = path_bucket)\n\n  \
+          \  # Create Cloud Run Service\n    from CustomLib.gcp import cloudrun\n\
+          \    cloud_run_name = list(labels.values())[0]+'-monitor-pred'\n\n    #====\
+          \ Create docker image and save in Artifact Registry ====#\n    MONITORING_IMAGE\
+          \ = build_monitoring_prediction_image(labels      = labels, \n         \
+          \                                                project     = project,\
+          \ \n                                                         location  \
+          \  = location, \n                                                      \
+          \   name_bucket = name_bucket, \n                                      \
+          \                   path_bucket = path_bucket)\n    # Create Cloud Run service\n\
+          \    out, err = cloudrun.service_create(service_name = cloud_run_name, \n\
+          \                                location     = location, \n           \
+          \                     image_name   = MONITORING_IMAGE)\n\n    print('EL\
+          \ OUT ES: '+ str(out))\n    print('EL ERR ES: '+ str(err))\n\n"
+        image: us-east4-docker.pkg.dev/astral-reef-391421/repo-mle-template/mle-template:latest
+        resources:
+          cpuLimit: 1.0
+          memoryLimit: 4.0
+pipelineInfo:
+  name: mlops-mle-template
+root:
+  dag:
+    tasks:
+      batch-predict:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-batch-predict
+        dependentTasks:
+        - get-data
+        inputs:
+          artifacts:
+            data_input:
+              taskOutputArtifact:
+                outputArtifactKey: dataset
+                producerTask: get-data
+          parameters:
+            features:
+              taskOutputParameter:
+                outputParameterKey: features
+                producerTask: get-data
+            labels:
+              componentInputParameter: labels
+            location:
+              componentInputParameter: location
+            model_name:
+              componentInputParameter: model_name
+            name_bucket:
+              componentInputParameter: name_bucket
+            path_bucket:
+              componentInputParameter: path_bucket
+            prod_config:
+              componentInputParameter: prod_config
+            project:
+              componentInputParameter: project
+            target:
+              taskOutputParameter:
+                outputParameterKey: target
+                producerTask: get-data
+            train_data_path:
+              taskOutputParameter:
+                outputParameterKey: train_data_path
+                producerTask: get-data
+        taskInfo:
+          name: Batch predictions
+      get-data:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-get-data
+        inputs:
+          parameters:
+            name_bucket:
+              componentInputParameter: name_bucket
+            path_bucket:
+              componentInputParameter: path_bucket
+        taskInfo:
+          name: Get Data
+      save-stats:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-save-stats
+        dependentTasks:
+        - batch-predict
+        inputs:
+          parameters:
+            job_name:
+              taskOutputParameter:
+                outputParameterKey: job_name
+                producerTask: batch-predict
+            labels:
+              componentInputParameter: labels
+            location:
+              componentInputParameter: location
+            name_bucket:
+              componentInputParameter: name_bucket
+            path_bucket:
+              componentInputParameter: path_bucket
+            project:
+              componentInputParameter: project
+        taskInfo:
+          name: Save Stats Predictions
+  inputDefinitions:
+    parameters:
+      labels:
+        parameterType: STRUCT
+      location:
+        parameterType: STRING
+      model_name:
+        parameterType: STRING
+      name_bucket:
+        parameterType: STRING
+      output_bq_dataset:
+        parameterType: STRING
+      output_bq_project:
+        parameterType: STRING
+      output_bq_table:
+        parameterType: STRING
+      path_bucket:
+        parameterType: STRING
+      prod_config:
+        parameterType: STRUCT
+      project:
+        parameterType: STRING
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.7.0
