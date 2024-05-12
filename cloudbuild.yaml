@@ -2,25 +2,25 @@ options:
   logging: CLOUD_LOGGING_ONLY
 
 steps:
-  # Step 0: Build the Docker image from the Dockerfile
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY_NAME/$_IMAGE_NAME:latest', '.']
+  # # Step 0: Build the Docker image from the Dockerfile
+  # - name: 'gcr.io/cloud-builders/docker'
+  #   args: ['build', '-t', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY_NAME/$_IMAGE_NAME:latest', '.']
 
-  # Step 1: Push the image to Google Artifact Registry
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY_NAME/$_IMAGE_NAME:latest']
+  # # Step 1: Push the image to Google Artifact Registry
+  # - name: 'gcr.io/cloud-builders/docker'
+  #   args: ['push', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY_NAME/$_IMAGE_NAME:latest']
 
-  # Step 2: Deploy the image to Google Cloud Run
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: 'gcloud'
-    args:
-      - 'run'
-      - 'deploy'
-      - '$_CLOUD_RUN_SERVICE'
-      - '--image=$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY_NAME/$_IMAGE_NAME:latest'
-      - '--region=$_REGION'
-      - '--platform=managed'
-      - '--allow-unauthenticated'
+  # # Step 2: Deploy the image to Google Cloud Run
+  # - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  #   entrypoint: 'gcloud'
+  #   args:
+  #     - 'run'
+  #     - 'deploy'
+  #     - '$_CLOUD_RUN_SERVICE'
+  #     - '--image=$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY_NAME/$_IMAGE_NAME:latest'
+  #     - '--region=$_REGION'
+  #     - '--platform=managed'
+  #     - '--allow-unauthenticated'
 
   # Step 3: Get and use the URL of the deployed Cloud Run service
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -29,14 +29,8 @@ steps:
       - '-c'
       - |
         set -e  # Stop execution on any error
-        _URL=$(gcloud run services describe $_CLOUD_RUN_SERVICE --region=$_REGION --platform=managed --format='value(status.url)')
-        echo "URL fetched: $_URL"  # Debug: Print the URL to the log to confirm it's correct
-        if [ -z "$_URL" ]; then
-          echo "Error: No URL found"  # Error handling: In case URL is empty
-          exit 1
-        fi
-        echo "Executing Cloud Run service at $_URL" &&
-        curl "$_URL/$_PIPELINE_TYPE"
+        echo "gcloud run services describe $_CLOUD_RUN_SERVICE --region=$_REGION --platform=managed --format='value(status.url)'"
+        curl "gcloud run services describe $_CLOUD_RUN_SERVICE --region=$_REGION --platform=managed --format='value(status.url)'/$_PIPELINE_TYPE"
 
 substitutions:
   _PROJECT_ID: 'astral-reef-391421'
