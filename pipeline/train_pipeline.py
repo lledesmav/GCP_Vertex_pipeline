@@ -143,7 +143,7 @@ def train_model(name_bucket     : str,
 #================================ testing_model COMPONENT ===================================#
 ##############################################################################################
 @component(base_image = BASE_IMAGE)
-def testing_model(model           : Input[Model],
+def testing_model(_model           : Input[Model],
                   data_test       : InputPath("Dataset"),
                   metrics         : Output[Metrics])->float:
 
@@ -152,8 +152,8 @@ def testing_model(model           : Input[Model],
     test_df = cloudstorage.read_csv_as_df(gcs_path = data_test + '.csv')
     
     #==== Read model artifact ====#
-    model = cloudstorage.read_pickle(gcs_path = model.path + '/model.pkl')
-    scaler = cloudstorage.read_pickle(gcs_path = model.path + '/scaler.pkl')
+    model = cloudstorage.read_pickle(gcs_path = _model.path + '/model.pkl')
+    scaler = cloudstorage.read_pickle(gcs_path = _model.path + '/scaler.pkl')
     
     #==== Evaluating the model ====#
     from src.utils import scaler_data
