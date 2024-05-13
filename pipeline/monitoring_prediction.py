@@ -10,7 +10,6 @@ import json
 file                      = open('config.json')
 config                    = json.load(file)
 
-CREDENTIAL_PATH   = config["PROJECT_KEY_PATH"]
 PROJECT_ID           = config["PIPELINE_PROJECT_ID"]
 REGION            = config["PIPELINE_REGION"]
 PATH         = config["PIPELINE_PATH_BUCKET"]+'/'+config["PIPELINE_METADATA"]["value"]
@@ -37,9 +36,8 @@ def download_blob(bucket_name, object_name, destination_file_name):
 
 from google.cloud import storage
 
-from google.oauth2.service_account import Credentials
-credentials = Credentials.from_service_account_file(CREDENTIAL_PATH)
-client = storage.Client(credentials=credentials)
+# Initialize the storage client using default application credentials
+client = storage.Client()
 
 train_object = PATH + "/stats_anomalies/model/training_stats.pb"
 download_blob(NAME_BUCKET, train_object,"train_stats.pb")
