@@ -97,21 +97,24 @@ def get_data(name_bucket : str,
 #============================ batch_predict COMPONENT ============================#
 ###################################################################################
 @component(base_image = BASE_IMAGE)
-def batch_predict(project          : str,
-                  location         : str,
-                  name_bucket      : str,
-                  path_bucket      : str,
-                  labels           : Dict,
-                  prod_config      : Dict,
-                  model_name       : str,
-                  features         : list,
-                  target           : str,
-                  train_data_path  : str,
-                  data_input       : InputPath("Dataset"), 
-                  data_output      : OutputPath("Dataset")) -> NamedTuple("output", [("job_name", str)]):
+def batch_predict(project           : str,
+                  location          : str,
+                  name_bucket       : str,
+                  path_bucket       : str,
+                  labels            : Dict,
+                  prod_config       : Dict,
+                  model_name        : str,
+                  features          : list,
+                  target            : str,
+                  train_data_path   : str,
+                  data_input        : InputPath("Dataset"), 
+                  output_bq_project : str,
+                  output_bq_dataset : str,
+                  output_bq_table   : str,
+                  data_output       : OutputPath("Dataset")) -> NamedTuple("output", [("job_name", str)]):
     
     #==== Read input data from GCS ====#
-    from CustomLib.gcp import cloudstorage
+    from CustomLib.gcp import cloudstorage, bigquery
     df = cloudstorage.read_csv_as_df(gcs_path = data_input + '.csv')
     
     #==== Get the model ====#
@@ -137,9 +140,14 @@ def batch_predict(project          : str,
                                                        df_to_predict     = df)
     
     #==== Save predictions ====#
-    cloudstorage.write_csv(df       = df_to_predict, 
-                           gcs_path = data_output +'.csv')
-    
+    # cloudstorage.write_csv(df       = df_to_predict, 
+    #                        gcs_path = data_output +'.csv')
+    bigquery.write_df(df         = df_to_predict,
+                      project_id = output_bq_project, 
+                      dataset_id = output_bq_dataset, 
+                      table_id   = output_bq_table,
+                      if_exists  = 'replace')
+
     Output = NamedTuple("output", [("job_name", str)])  # Define the NamedTuple
     result = Output(job_name=job_name)  # Create an instance with the job_name
     
@@ -150,36 +158,15 @@ def batch_predict(project          : str,
 #============================ save_stats COMPONENT ============================#
 ################################################################################
 @component(base_image = BASE_IMAGE)
-def save_stats(project          : str,
-               location         : str,
-               name_bucket      : str,
+def save_stats(name_bucket      : str,
                path_bucket      : str,
-               labels           : Dict,
                job_name         : str):
     
     # Move stats files in GCS
-    from pipeline.prod_modules import move_stats_file, build_monitoring_prediction_image
+    from pipeline.prod_modules import move_stats_file
     move_stats_file(job_name    = job_name, 
                     name_bucket = name_bucket, 
                     path_bucket = path_bucket)
-    
-    # Create Cloud Run Service
-    from CustomLib.gcp import cloudrun
-    cloud_run_name = list(labels.values())[0]+'-monitor-pred'
-
-    #==== Create docker image and save in Artifact Registry ====#
-    MONITORING_IMAGE = build_monitoring_prediction_image(labels      = labels, 
-                                                         project     = project, 
-                                                         location    = location, 
-                                                         name_bucket = name_bucket, 
-                                                         path_bucket = path_bucket)
-    # Create Cloud Run service
-    out, err = cloudrun.service_create(service_name = cloud_run_name, 
-                                location     = location, 
-                                image_name   = MONITORING_IMAGE)
-    
-    print('EL OUT ES: '+ str(out))
-    print('EL ERR ES: '+ str(err))
 
 
 ###################################################################################
@@ -217,17 +204,17 @@ def predict_pipeline(project           : str,
                                          features          = get_data_op.outputs["features"],
                                          target            = get_data_op.outputs["target"],
                                          train_data_path   = get_data_op.outputs["train_data_path"],
-                                         data_input        = get_data_op.outputs['dataset'])\
+                                         data_input        = get_data_op.outputs['dataset'],
+                                         output_bq_project = output_bq_project,
+                                         output_bq_dataset = output_bq_dataset,
+                                         output_bq_table   = output_bq_table)\
         .set_cpu_limit('1')\
         .set_memory_limit('4G')\
         .set_display_name('Batch predictions')
 
 
-        save_stats_op = save_stats(project          = project,
-                                   location         = location,
-                                   name_bucket      = name_bucket,
+        save_stats_op = save_stats(name_bucket      = name_bucket,
                                    path_bucket      = path_bucket,
-                                   labels           = labels,
                                    job_name         = batch_predict_op.outputs["job_name"])\
         .set_cpu_limit('1')\
         .set_memory_limit('4G')\

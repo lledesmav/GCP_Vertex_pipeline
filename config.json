@@ -11,8 +11,8 @@
     "PIPELINE_ALERT_MAILS"         : ["enriquemejiagamarra@gmail.com"],
     
     "OUTPUT_PROJECT_ID"            : "astral-reef-391421",
-    "OUTPUT_DATASET_ID"            : "Mlops",
-    "OUTPUT_TABLE_ID"              : "MlopsTemplate",
+    "OUTPUT_DATASET_ID"            : "MlopsTemplate",
+    "OUTPUT_TABLE_ID"              : "Predictions",
     
     "OUTPUT_SCHEMA"                : {"field_name": ["sepal_length_cm", "sepal_width_cm", "petal_length_cm", "petal_width_cm", "predictions"],
                                       "type": ["FLOAT", "FLOAT", "FLOAT", "FLOAT", "FLOAT"],

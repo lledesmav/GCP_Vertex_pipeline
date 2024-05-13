@@ -37,20 +37,20 @@ steps:
       - '--allow-unauthenticated'
       - '--memory=2Gi'
 
-  # Step 4: Check status and use the URL of the deployed Cloud Run service
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: 'sh'
-    args:
-      - '-c'
-      - |
-        set -e  
-        while [ "$(gcloud run services describe mle-template-service --region=us-east4 --platform=managed --format='value(status.conditions[0].status)')" != "True" ]; do 
-          echo "Waiting for service to become stable..." 
-          sleep 10 
-        done 
-        echo "Service is stable" 
-        curl "$(gcloud run services describe mle-template-service --region=us-east4 --platform=managed --format='value(status.url)')/train_pipeline" 
-        curl "$(gcloud run services describe mle-template-service --region=us-east4 --platform=managed --format='value(status.url)')/predict_pipeline"
+  # # Step 4: Check status and use the URL of the deployed Cloud Run service
+  # - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  #   entrypoint: 'sh'
+  #   args:
+  #     - '-c'
+  #     - |
+  #       set -e  
+  #       while [ "$(gcloud run services describe mle-template-service --region=us-east4 --platform=managed --format='value(status.conditions[0].status)')" != "True" ]; do 
+  #         echo "Waiting for service to become stable..." 
+  #         sleep 10 
+  #       done 
+  #       echo "Service is stable" 
+  #       curl "$(gcloud run services describe mle-template-service --region=us-east4 --platform=managed --format='value(status.url)')/train_pipeline" 
+  #       curl "$(gcloud run services describe mle-template-service --region=us-east4 --platform=managed --format='value(status.url)')/predict_pipeline"
 
 substitutions:
   _PROJECT_ID: 'astral-reef-391421'

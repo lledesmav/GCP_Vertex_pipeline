@@ -54,40 +54,46 @@ def write_df(df: pd.DataFrame,
         None
     """
     # Authentication
+    project_id_source = os.environ.get('GOOGLE_CLOUD_PROJECT', None)
     if credential_path:
         credentials = service_account.Credentials.from_service_account_file(credential_path, scopes=["https://www.googleapis.com/auth/cloud-platform"])
-        client = bigquery.Client(project=project_id, credentials=credentials)
+        client = bigquery.Client(project=credentials.project_id, credentials=credentials)
     else:
-        client = bigquery.Client(project=project_id)
-
-    dataset_ref = client.dataset(dataset_id)
-    
-    # Check if dataset exists, if not create it
-    try:
-        client.get_dataset(dataset_ref)
-    except exceptions.NotFound:
-        dataset = bigquery.Dataset(dataset_ref)
-        client.create_dataset(dataset)
-    
+        if project_id_source:
+            # Create a BigQuery client
+            client = bigquery.Client(project=project_id_source)
+        else:
+            client = bigquery.Client()
+        
+    # Define dataset and table references for the target project
+    dataset_ref = bigquery.DatasetReference(project_id, dataset_id)
     table_ref = dataset_ref.table(table_id)
     
-    # Check if table exists
+    # Check if dataset exists in the project, if not create it
     try:
-        table = client.get_table(table_ref)
+        client.get_dataset(dataset_ref)  # This uses the client from  default project but checks in project_id
+    except exceptions.NotFound:
+        dataset = bigquery.Dataset(dataset_ref)
+        client.create_dataset(dataset)  # Dataset created in the project_id
+    
+    
+    # Check if table exists in the project_id
+    try:
+        client.get_table(table_ref)  # Try getting the table in the project_id
         table_exists = True
     except exceptions.NotFound:
         table_exists = False
-
-    # Handle 'if_exists' parameter
-    if if_exists == 'fail' and table_exists:
-        raise ValueError(f"Table {table_id} already exists.")
         
+        
+    # Handle 'if_exists' parameter logic
+    if if_exists == 'fail' and table_exists:
+        raise ValueError(f"Table {table_id} in dataset {dataset_id} already exists in project {project_id}.")
     elif if_exists == 'replace' and table_exists:
-        client.delete_table(table_ref)
+        client.delete_table(table_ref)  # Delete the existing table in the target project
         table_exists = False
-    
     elif if_exists not in ['fail', 'replace', 'append']:
         raise ValueError(f"Invalid value for 'if_exists': {if_exists}")
+    
 
     # Create or update table schema
     if not table_exists and schema_dict:
@@ -98,12 +104,12 @@ def write_df(df: pd.DataFrame,
                                                      schema_dict['description'])]
         table = bigquery.Table(table_ref, schema=schema)
         client.create_table(table)
-             
     elif table_exists and if_exists != 'append' and schema_dict:
-        new_schema = [bigquery.SchemaField(field.name, field.field_type, description=desc)
+        new_schema = [bigquery.SchemaField(field.name, field.field_type, mode=field.mode, description=desc)
                       for field, desc in zip(table.schema, schema_dict['description'])]
         table.schema = new_schema
         client.update_table(table, ['schema'])
+        
         
     # Write DataFrame to BigQuery
     job_config = bigquery.LoadJobConfig()
@@ -114,8 +120,8 @@ def write_df(df: pd.DataFrame,
                                                           schema_dict['mode'])]
     job = client.load_table_from_dataframe(df, table_ref, job_config=job_config)
     job.result()  # Wait for job to complete
+
     
-    #print(f"Tabla creada: {project_id}.{dataset_id}.{table_id}")
 
 def execute_query(query: str, credential_path: str = '') -> str:
     """
