@@ -35,6 +35,7 @@ steps:
       - '--region=$_REGION'
       - '--platform=managed'
       - '--allow-unauthenticated'
+      - '--memory=2Gi'
 
   # Step 4: Check status and use the URL of the deployed Cloud Run service
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'

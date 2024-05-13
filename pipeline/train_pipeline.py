@@ -113,7 +113,7 @@ def train_model(name_bucket     : str,
                             gcs_path  = gcs_path)
     
     #==== Training the model ====#
-    from src.utils import preprocess_data
+    from src.utils import preprocess_data, train_model
     train_df, scaler = preprocess_data(train_df)
 
     # Separating features and target for training
