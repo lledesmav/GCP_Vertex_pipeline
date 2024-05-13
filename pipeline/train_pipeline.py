@@ -175,7 +175,7 @@ def testing_model(_model           : Input[Model],
 #============================ create_custom_predict_container COMPONENT ============================#
 #####################################################################################################
 @component(base_image          = BASE_IMAGE,
-           packages_to_install = ["google-cloud-aiplatform[prediction]==1.33.1"])
+           packages_to_install = ["google-cloud-aiplatform[prediction]==1.51.0"])
 def create_custom_predict(project         : str,
                           location        : str,
                           name_bucket     : str,
@@ -202,11 +202,11 @@ def create_custom_predict(project         : str,
 #========================= upload_to_model_registry COMPONENT ==========================#
 ######################################################################################### 
 @component(base_image="python:3.9",
-           packages_to_install=["google-cloud-aiplatform==1.29.0", 
-                                "google-auth==2.17.3",
-                                "google-auth-oauthlib==0.4.6",
-                                "google-auth-httplib2==0.1.0",
-                                "google-api-python-client==1.8.0"])
+           packages_to_install=["google-cloud-aiplatform==1.51.0", 
+                                "google-auth==2.27.0",
+                                "google-auth-oauthlib==1.2.0",
+                                "google-auth-httplib2==0.2.0",
+                                "google-api-python-client==1.12.11"])
 def upload_to_model_registry(project                     : str,
                              location                    : str,
                              name_bucket                 : str,
@@ -286,11 +286,11 @@ def upload_to_model_registry(project                     : str,
 #========================== deploy_model_endpoint COMPONENT ============================#
 ######################################################################################### 
 @component(base_image="python:3.9",
-           packages_to_install=["google-cloud-aiplatform==1.29.0", 
-                                "google-auth==2.17.3",
-                                "google-auth-oauthlib==0.4.6",
-                                "google-auth-httplib2==0.1.0",
-                                "google-api-python-client==1.8.0"])
+           packages_to_install=["google-cloud-aiplatform==1.51.0", 
+                                "google-auth==2.27.0",
+                                "google-auth-oauthlib==1.2.0",
+                                "google-auth-httplib2==0.2.0",
+                                "google-api-python-client==1.12.11"])
 def deploy_model_endpoint(project         : str,
                           location        : str,
                           model_name      : str,
