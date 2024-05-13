@@ -404,15 +404,15 @@ def train_pipeline(project           : str,
             .set_memory_limit('4G')\
             .set_display_name('Save Model')
 
-            # deploy_model_endpoint_op = deploy_model_endpoint(project         = project,
-            #                                              location        = location,
-            #                                              model_name      = model_name,
-            #                                              model_id        = upload_model_op.outputs["Output"],
-            #                                              machine_type    = 'n1-standard-2',
-            #                                              labels          = labels)\
-            # .set_cpu_limit('4')\
-            # .set_memory_limit('8G')\
-            # .set_display_name('Deploy model in an endpoint')
+            deploy_model_endpoint_op = deploy_model_endpoint(project         = project,
+                                                         location        = location,
+                                                         model_name      = model_name,
+                                                         model_id        = upload_model_op.outputs["Output"],
+                                                         machine_type    = 'n1-standard-2',
+                                                         labels          = labels)\
+            .set_cpu_limit('4')\
+            .set_memory_limit('8G')\
+            .set_display_name('Deploy model in an endpoint')
 
 ###################################################################################
 #================================= COMPILE & RUN =================================#
