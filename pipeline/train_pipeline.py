@@ -376,7 +376,7 @@ def train_pipeline(project           : str,
         .set_memory_limit('4G')\
         .set_display_name('Train Model')
 
-        testing_model_op = testing_model(model     = train_model_op.outputs['model'],
+        testing_model_op = testing_model(_model     = train_model_op.outputs['model'],
                                          data_test = split_data_op.outputs['data_test'])\
         .set_cpu_limit('1')\
         .set_memory_limit('4G')\
