@@ -247,33 +247,4 @@ def move_stats_file(job_name   : str,
                                destination = output_train_bucket.strip())
     _ = cloudstorage.copy_file(source      = input_current_bucket.strip(), 
                                destination = output_current_bucket.strip())
-    
-    
-def build_monitoring_prediction_image(labels      : Dict, 
-                                      project     : str, 
-                                      location    : str, 
-                                      name_bucket : str, 
-                                      path_bucket : str):
-    import subprocess
-    # Create Docker image and send it to Artifact Registry
-    repo_name        = 'repo-'+list(labels.values())[0]
-    container        = list(labels.values())[0]+'-monitor-pred'
-    MONITORING_IMAGE = '{}-docker.pkg.dev/{}/{}/{}:latest'.format(location, project, repo_name ,container)
-    
-    # Update the JSON file for monitoring_prediction
-    import json
-    update_json={"PROJECT_ID"  : project,
-                 "REGION"      : location,
-                 "NAME_BUCKET" : name_bucket,
-                 "PATH_BUCKET" : path_bucket}
-    with open("pipeline/monitoring_prediction/config.json", "w") as outfile:
-        json.dump(update_json, outfile)
-        
-    # Create the build
-    out, err = cloudbuild.submit(image_name = MONITORING_IMAGE,
-                                   code_path = "pipeline/monitoring_prediction",
-                                   name_bucket = name_bucket,
-                                   project_id = project)
-    
-    return MONITORING_IMAGE
         
