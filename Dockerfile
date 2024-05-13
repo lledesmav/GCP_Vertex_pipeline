@@ -1,4 +1,4 @@
-FROM gcr.io/google.com/cloudsdktool/google-cloud-cli:470.0.0-slim
+FROM gcr.io/google.com/cloudsdktool/google-cloud-cli:455.0.0-slim
 
 # Allow statements and log messages to immediately appear in the Knative logs
 ENV PYTHONUNBUFFERED True

@@ -203,7 +203,7 @@ def create_custom_predict(project         : str,
 ######################################################################################### 
 @component(base_image="python:3.9",
            packages_to_install=["google-cloud-aiplatform==1.51.0", 
-                                "google-auth==2.27.0",
+                                "google-auth==2.29.0",
                                 "google-auth-oauthlib==1.2.0",
                                 "google-auth-httplib2==0.2.0",
                                 "google-api-python-client==1.12.11"])
@@ -287,7 +287,7 @@ def upload_to_model_registry(project                     : str,
 ######################################################################################### 
 @component(base_image="python:3.9",
            packages_to_install=["google-cloud-aiplatform==1.51.0", 
-                                "google-auth==2.27.0",
+                                "google-auth==2.29.0",
                                 "google-auth-oauthlib==1.2.0",
                                 "google-auth-httplib2==0.2.0",
                                 "google-api-python-client==1.12.11"])
