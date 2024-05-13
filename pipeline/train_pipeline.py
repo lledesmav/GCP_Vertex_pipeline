@@ -73,7 +73,6 @@ def get_data(dataset : OutputPath("Dataset")):
 ##############################################################################################
 @component(base_image = BASE_IMAGE)
 def split_data(data_input      : InputPath("Dataset"),
-               scaler          : Output[Model],
                data_train      : OutputPath("Dataset"),
                data_test       : OutputPath("Dataset"),):
     
@@ -82,18 +81,14 @@ def split_data(data_input      : InputPath("Dataset"),
     data = cloudstorage.read_csv_as_df(gcs_path = data_input + '.csv')
     
     #==== Preprocessing the data ====#
-    from src.utils import preprocess_data
-    train_df, test_df, scaler_model = preprocess_data(data)
+    from src.utils import split_data
+    train_df, test_df = split_data(data)
     
     #==== Save the df in GCS ====#
     cloudstorage.write_csv(df       = train_df, 
                            gcs_path = data_train + '.csv')
     cloudstorage.write_csv(df       = test_df, 
                            gcs_path = data_test + '.csv')
-    
-    #==== Save the scaler in GCS ====#
-    cloudstorage.write_pickle(model    = scaler_model, 
-                              gcs_path = scaler.path + '/scaler.pkl')
     
 ##############################################################################################
 #=================================== train_model COMPONENT ==================================#
@@ -102,7 +97,6 @@ def split_data(data_input      : InputPath("Dataset"),
 def train_model(name_bucket     : str,
                 path_bucket     : str,
                 data_train      : InputPath("Dataset"),
-                scaler          : Input[Model],
                 model           : Output[Model],
                 metrics         : Output[Metrics]):
     
@@ -119,7 +113,9 @@ def train_model(name_bucket     : str,
                             gcs_path  = gcs_path)
     
     #==== Training the model ====#
-    from src.utils import train_model
+    from src.utils import preprocess_data
+    train_df, scaler = preprocess_data(train_df)
+
     # Separating features and target for training
     X_train = train_df.drop(columns=['target'])
     y_train = train_df['target']
@@ -135,9 +131,6 @@ def train_model(name_bucket     : str,
     
     for metric,value in log.items():
         metrics.log_metric(metric, value)
-        
-    #==== Read scaler artifact ====#
-    scaler = cloudstorage.read_pickle(gcs_path = scaler.path + '/scaler.pkl')
     
     #==== Save the model and scaler as a .pkl file ====#
     cloudstorage.write_pickle(model    = model_iris, 
@@ -160,8 +153,11 @@ def testing_model(model           : Input[Model],
     
     #==== Read model artifact ====#
     model = cloudstorage.read_pickle(gcs_path = model.path + '/model.pkl')
+    scaler = cloudstorage.read_pickle(gcs_path = model.path + '/scaler.pkl')
     
     #==== Evaluating the model ====#
+    from src.utils import scaler_data
+    test_df = scaler_data(scaler, test_df)
     X_test = test_df.drop(columns=['target'])
     y_test = test_df['target']
     predictions = model.predict(X_test)
@@ -375,8 +371,7 @@ def train_pipeline(project           : str,
 
         train_model_op = train_model(name_bucket = name_bucket,
                                      path_bucket = path_bucket,
-                                     data_train  = split_data_op.outputs['data_train'],
-                                     scaler      = split_data_op.outputs['scaler'])\
+                                     data_train  = split_data_op.outputs['data_train'])\
         .set_cpu_limit('1')\
         .set_memory_limit('4G')\
         .set_display_name('Train Model')

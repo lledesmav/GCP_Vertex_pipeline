@@ -4,16 +4,10 @@ from sklearn.metrics import accuracy_score
 from sklearn.ensemble import RandomForestClassifier
 import pandas as pd
 
-# Preprocessing function
-def preprocess_data(data):
+def split_data(data):
     X = data.drop(columns=['target'])
     y = data['target']
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    
-    # Standardizing the data
-    scaler = StandardScaler()
-    X_train = scaler.fit_transform(X_train)
-    X_test = scaler.transform(X_test)
 
     # Converting to DataFrames
     train_df = pd.DataFrame(X_train, columns=X.columns)
@@ -21,7 +15,32 @@ def preprocess_data(data):
     test_df = pd.DataFrame(X_test, columns=X.columns)
     test_df['target'] = y_test.values
 
-    return train_df, test_df, scaler
+    return train_df, test_df
+
+# Preprocessing function
+def preprocess_data(train_df):
+    X_train = train_df.drop(columns=['target'])
+
+    # Standardizing the data
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+
+    # Replacing the new values
+    train_df[X_train.columns] = X_train_scaled
+
+    return train_df, scaler
+
+def scaler_data(scaler, test_df):
+    # Separating the features and target
+    X_test = test_df.drop(columns=['target'])
+    
+    # Standardizing the data
+    X_test_scaled = scaler.transform(X_test)
+    
+    # Replacing the new values
+    test_df[X_test.columns] = X_test_scaled
+    
+    return test_df
 
 # Model training function
 def train_model(X_train, y_train):

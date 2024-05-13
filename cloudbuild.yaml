@@ -42,9 +42,7 @@ steps:
     args:
       - '-c'
       - |
-
-        set -e  # Stop execution on any error
-        # Check service status 
+        set -e  
         while [ "$(gcloud run services describe mle-template-service --region=us-east4 --platform=managed --format='value(status.conditions[0].status)')" != "True" ]; do 
           echo "Waiting for service to become stable..." 
           sleep 10 
@@ -52,15 +50,6 @@ steps:
         echo "Service is stable" 
         curl "$(gcloud run services describe mle-template-service --region=us-east4 --platform=managed --format='value(status.url)')/train_pipeline" 
         curl "$(gcloud run services describe mle-template-service --region=us-east4 --platform=managed --format='value(status.url)')/predict_pipeline"
-
-
-        # set -e  # Stop execution on any error
-        # # Wait for the service to be fully ready
-        # sleep 35
-        # # Accessing train_pipeline
-        # curl "$(gcloud run services describe $_CLOUD_RUN_SERVICE --region=$_REGION --platform=managed --format='value(status.url)')/train_pipeline"
-        # # Accessing predict_pipeline
-        # curl "$(gcloud run services describe $_CLOUD_RUN_SERVICE --region=$_REGION --platform=managed --format='value(status.url)')/predict_pipeline"
 
 substitutions:
   _PROJECT_ID: 'astral-reef-391421'
