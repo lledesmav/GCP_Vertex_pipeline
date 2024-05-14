@@ -54,7 +54,7 @@ steps:
 
 substitutions:
   _PROJECT_ID: 'astral-reef-391421'
-  _REGION: 'us-central1'
-  _REPOSITORY_NAME: 'mle-template'
+  _REGION: 'us-east4'
+  _REPOSITORY_NAME: 'repo-mle-template'
   _IMAGE_NAME: 'mle-template'
   _CLOUD_RUN_SERVICE: 'mle-template-service'
