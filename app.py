@@ -32,3 +32,4 @@ def monitoring():
     render_ = all_models()
     
     return render_
+
