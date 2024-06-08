@@ -4,9 +4,9 @@ options:
 steps:
   # Step 0: Build the Docker image from the Dockerfile
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY_NAME/$_IMAGE_NAME:latest', '.']
+    args: ['build', '-t', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY_NAME/$_IMAGE_NAME:latest', '.'] # No se esta pasando directamente, sino por comas
 
-  # Step 1: Check if the Artifact Repository exists and create it if not
+  # Step 1: Check if the Artifact Repository exists and create it if not (verificamos si existe el repositorio en Artifiac R, sino existe lo creamos)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'sh'
     args:
@@ -20,41 +20,44 @@ steps:
           echo "Repository $_REPOSITORY_NAME already exists."
         fi
 
-  # Step 2: Push the image to Google Artifact Registry
+  # Step 2: Push the image to Google Artifact Registry (hacemos el push de la imagen que hemos creado localmente hacia el repositorio de Artifac registry)
+  # Se esta haciendo el push a los contenedores de GCP que es llamado Google Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY_NAME/$_IMAGE_NAME:latest']
+    args: ['push', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY_NAME/$_IMAGE_NAME:latest'] # tal cual se definio en el "Step0" se vuelve a crear la misma imagen
 
-  # Step 3: Deploy the image to Google Cloud Run
+  # Step 3: Deploy the image to Google Cloud Run (despliegue de la imagen de docker en el gcp cloud run)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
     args:
       - 'run'
       - 'deploy'
-      - '$_CLOUD_RUN_SERVICE'
-      - '--image=$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY_NAME/$_IMAGE_NAME:latest'
+      - '$_CLOUD_RUN_SERVICE' #nombre del servicio de google cloud, que es donde ahi se encuentra la imagen
+      - '--image=$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY_NAME/$_IMAGE_NAME:latest' #copia y pega de la ruta de los pasos anteriores
       - '--region=$_REGION'
-      - '--platform=managed'
-      - '--allow-unauthenticated'
+      - '--platform=managed' # plataforma de gcp
+      - '--allow-unauthenticated' # significa que sera usuado por cualquier usuario
       - '--memory=2Gi'
 
-  # Step 4: Check status and use the URL of the deployed Cloud Run service
+  # Step 4: Check status and use the URL of the deployed Cloud Run service ( como es un aplicativo web se ejecuta dos rutas especificas con curl que son 'train_pipele' y 'predict_pipline')
+  # Ejetucamos una ruta especifica de nuestro aplicativo web. Esto sirve para levantar pipelines de Vertex AI
+  # 
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'sh'
     args:
       - '-c'
       - |
         set -e  
-        while [ "$(gcloud run services describe mle-template-service --region=us-east4 --platform=managed --format='value(status.conditions[0].status)')" != "True" ]; do 
+        while [ "$(gcloud run services describe mle-template-service --region=us-central1 --platform=managed --format='value(status.conditions[0].status)')" != "True" ]; do 
           echo "Waiting for service to become stable..." 
           sleep 10 
         done 
         echo "Service is stable" 
-        curl "$(gcloud run services describe mle-template-service --region=us-east4 --platform=managed --format='value(status.url)')/train_pipeline" 
-        curl "$(gcloud run services describe mle-template-service --region=us-east4 --platform=managed --format='value(status.url)')/predict_pipeline"
+        curl "$(gcloud run services describe mle-template-service --region=us-central1 --platform=managed --format='value(status.url)')/train_pipeline" 
+        curl "$(gcloud run services describe mle-template-service --region=us-central1 --platform=managed --format='value(status.url)')/predict_pipeline"
 
 substitutions:
-  _PROJECT_ID: 'astral-reef-391421'
-  _REGION: 'us-east4'
+  _PROJECT_ID: 'core-song-419302'
+  _REGION: 'us-central1'
   _REPOSITORY_NAME: 'repo-mle-template'
   _IMAGE_NAME: 'mle-template'
   _CLOUD_RUN_SERVICE: 'mle-template-service'

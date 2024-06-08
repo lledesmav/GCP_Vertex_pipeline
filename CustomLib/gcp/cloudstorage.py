@@ -28,7 +28,7 @@ def split_gcs_path(gcs_path:str) -> Tuple[str, str]:
         
 def write_csv(df: pd.DataFrame, 
               gcs_path:str,
-              credential_path:str = '') -> None:
+              credential_path:str = '') -> None: # se pone en blanco '' porque estamos usando las credenciales del cliente por defecto
     """
     Writes a pandas DataFrame to a CSV file in Google Cloud Storage.
     

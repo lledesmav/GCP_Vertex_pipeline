@@ -30,7 +30,7 @@ TIMESTAMP         = datetime.now().strftime("%Y%m%d%H%M%S")
 DISPLAY_NAME      = config["PIPELINE_METADATA"]["key"]+"-"+config["PIPELINE_METADATA"]["value"]+'-train-{}'.format(TIMESTAMP)
 
 BASE_CONTAINER_IMAGE_NAME = config["PIPELINE_METADATA"]["value"]
-BASE_IMAGE                = '{}-docker.pkg.dev/{}/{}/{}:'.format(REGION, 
+BASE_IMAGE                = '{}-docker.pkg.dev/{}/{}/{}:'.format(REGION, # Esta imagen almacena todo (archivos) los que esta dentro de la carpeta GCP_Vertex_pipeline
                                                                  PROJECT, 
                                                                  'repo-'+BASE_CONTAINER_IMAGE_NAME, 
                                                                  BASE_CONTAINER_IMAGE_NAME)+'latest'
@@ -39,14 +39,14 @@ BASE_IMAGE                = '{}-docker.pkg.dev/{}/{}/{}:'.format(REGION,
 ##############################################################################################
 #===================================== get_data COMPONENT ===================================#
 ##############################################################################################
-@component(base_image = BASE_IMAGE)
-def get_data(dataset : OutputPath("Dataset")):
+@component(base_image = BASE_IMAGE) # Este componente en si tiene una imagen base, ya que cada una de las componentes se ejecuta dentro de un contenedor. 'BASE_IMAGE' se define en la ruta que inidica la linea 33
+def get_data(dataset : OutputPath("Dataset")): # El parametro OutputPath es especifica porque vienen de la linea 1 que son parametros que vienen de la libreria kubeflow. Lo cual quiere decir que OutputPath es una ruta que le pondra nombre de 'Dataset'
     
-    #==== Importing necessary libraries ====#
+    #==== Importing necessary libraries ====# Lo que contiene aqui y lineas abajo es lo mismo que el archivo "0. Flow Test.ipynb" que es trabajo por el DataScientis, lo cual simplemente se copia y pega aqui.
     import pandas as pd
     from sklearn.datasets import load_iris
     
-    #==== Loading the Iris dataset ====#
+    #==== Loading the Iris dataset ====# 
     iris = load_iris()
     data = pd.DataFrame(data=iris['data'], columns=iris['feature_names'])
     data['target'] = iris['target']
@@ -63,28 +63,28 @@ def get_data(dataset : OutputPath("Dataset")):
     data.rename(columns=column_mapping, inplace=True)
     
     #==== Save the df in GCS ====#
-    from CustomLib.gcp import cloudstorage
-    cloudstorage.write_csv(df       = data, 
-                           gcs_path = dataset + '.csv')
+    from CustomLib.gcp import cloudstorage # esta es una libreria personalizada que esta en la carpeta 'CustomLib'. Aqui hay funciones personalizadas para el uso de los diferentes servicios dentro de GCP principalmente bigquery, cloudbuild, , cloudrun, cloustorae 
+    cloudstorage.write_csv(df       = data, # se esta escribiendo un csv dentro de un cloudstorage. Esto lo puedes revisar en el archivo cloudstorage.py linea 29 de la carpeta "Customlib.gcp"
+                           gcs_path = dataset + '.csv') # se guarda la basededatos en la ruta 'dataset' que se definio arriba
     
     
 ##############################################################################################
 #=================================== split_data COMPONENT ===================================#
 ##############################################################################################
 @component(base_image = BASE_IMAGE)
-def split_data(data_input      : InputPath("Dataset"),
-               data_train      : OutputPath("Dataset"),
+def split_data(data_input      : InputPath("Dataset"), # este path debe ser el mismo donde se guardo el archivo del compenente anterior pero en este caso ya se convierte en un Inputpath ya que va a recibir data del componente anterior 
+               data_train      : OutputPath("Dataset"), # y luego a la vez este va entregar dos outputpath
                data_test       : OutputPath("Dataset"),):
     
     #==== Read input data from GCS ====#
     from CustomLib.gcp import cloudstorage
-    data = cloudstorage.read_csv_as_df(gcs_path = data_input + '.csv')
+    data = cloudstorage.read_csv_as_df(gcs_path = data_input + '.csv') 
     
-    #==== Preprocessing the data ====#
+    #==== Preprocessing the data ====# aqui se hace uso de las funciones personalizadas que creo el DS y que las puso en utils.py
     from src.utils import split_data
     train_df, test_df = split_data(data)
     
-    #==== Save the df in GCS ====#
+    #==== Save the df in GCS ====# se estan guardando la data de entrenamiento y test en dos rutas diferentes
     cloudstorage.write_csv(df       = train_df, 
                            gcs_path = data_train + '.csv')
     cloudstorage.write_csv(df       = test_df, 
@@ -97,14 +97,14 @@ def split_data(data_input      : InputPath("Dataset"),
 def train_model(name_bucket     : str,
                 path_bucket     : str,
                 data_train      : InputPath("Dataset"),
-                model           : Output[Model],
-                metrics         : Output[Metrics]):
+                model           : Output[Model], #se tipifica de esta forma
+                metrics         : Output[Metrics]): #se tipifica de esta forma
     
     #==== Read train data from GCS ====#
     from CustomLib.gcp import cloudstorage
     train_df = cloudstorage.read_csv_as_df(gcs_path = data_train + '.csv')
     
-    #==== Save train data for monitoring ====#
+    #==== Save train data for monitoring ====# Se guarda previamente para los monitoreros para comparacion de metricas
     file_name = "last_training_path.txt"
     gcs_path = f"gs://{name_bucket}/{path_bucket}/{file_name}"
     with open(file_name, 'w') as file:
@@ -112,7 +112,7 @@ def train_model(name_bucket     : str,
     cloudstorage.write_text(text_path = file_name, 
                             gcs_path  = gcs_path)
     
-    #==== Training the model ====#
+    #==== Training the model ====# se hace un pequeño preprocesamiento
     from src.utils import preprocess_data, train_model
     train_df, scaler = preprocess_data(train_df)
 
@@ -140,10 +140,10 @@ def train_model(name_bucket     : str,
     
     
 ##############################################################################################
-#================================ testing_model COMPONENT ===================================#
+#================================ testing_model COMPONENT ===================================# Ahora revisaremos el performance de la data de testeo
 ##############################################################################################
 @component(base_image = BASE_IMAGE)
-def testing_model(_model           : Input[Model],
+def testing_model(_model           : Input[Model], # se ha colocado "_" como nombre al "_model" para que no confunda con la variable 'model' de la linea 155
                   data_test       : InputPath("Dataset"),
                   metrics         : Output[Metrics])->float:
 
@@ -169,14 +169,14 @@ def testing_model(_model           : Input[Model],
     for metric,value in logs.items():
         metrics.log_metric(metric, value)
     
-    return logs['f1']
+    return logs['f1'] # devolvemos la metrica de 'f1' que es la que va a pasar al condicional que aparece en la linea 385 (threashold)
     
 #####################################################################################################
-#============================ create_custom_predict_container COMPONENT ============================#
+#============================ create_custom_predict_container COMPONENT ============================# Este es el componente donde creamos la imagen
 #####################################################################################################
 @component(base_image          = BASE_IMAGE,
            packages_to_install = ["google-cloud-aiplatform[prediction]==1.51.0"])
-def create_custom_predict(project         : str,
+def create_custom_predict(project         : str, # la funcion 'create_custom_predict' se refiere a todo proceso que se va implementar cuando se llame al modelo
                           location        : str,
                           name_bucket     : str,
                           labels          : Dict)-> str:
@@ -189,7 +189,7 @@ def create_custom_predict(project         : str,
     #==== Build the Custom Predict Routine ====#
     from pipeline.prod_modules import build_custom_predict_routine_image
     out, err = build_custom_predict_routine_image(BASE_IMAGE             = BASE_IMAGE,
-                                                  CUST_PRED_ROUTINE_PATH = "pipeline/custom_prediction",
+                                                  CUST_PRED_ROUTINE_PATH = "pipeline/custom_prediction", #aqui se encuentran todos los archivos para crear un contenedor de docker
                                                   PROJECT_ID             = project,
                                                   NAME_BUCKET            = name_bucket)
     
@@ -199,8 +199,8 @@ def create_custom_predict(project         : str,
     return BASE_IMAGE
     
 ######################################################################################### 
-#========================= upload_to_model_registry COMPONENT ==========================#
-######################################################################################### 
+#========================= upload_to_model_registry COMPONENT ==========================# Aqui cargaremos el modelo a 'model.registry'
+######################################################################################### Este componente siempre esta presente en cualquier solucion, podemos copiar y pegar esta plantilla en casos futuros
 @component(base_image="python:3.9",
            packages_to_install=["google-cloud-aiplatform==1.51.0", 
                                 "google-auth==2.29.0",
@@ -254,7 +254,7 @@ def upload_to_model_registry(project                     : str,
 
     aiplatform.init(project=project, location=location, credentials=credentials)
     
-    #=== Check if exist a previous version of the model ===#
+    #=== Check if exist a previous version of the model ===# Verifica si ya hay otro modelo guardado anteriromente en 'modelo.registry' , en caso sea si se le agregara otra version
     model_list=aiplatform.Model.list(filter = 'display_name="{}"'.format(model_name))
     if len(model_list)>0:
         parent_model_name = model_list[0].name
@@ -268,13 +268,13 @@ def upload_to_model_registry(project                     : str,
                                     parent_model                    = parent_model_name,
                                     description                     = description,
                                     labels                          = labels,
-                                    serving_container_image_uri     = serving_container_image_uri,
+                                    serving_container_image_uri     = serving_container_image_uri, #esta es la ruta donde se esta guardando la imagen que se creo en la linea 177
                                     version_aliases                 = [model_name+'-'+timestamp],        
                                     serving_container_health_route  = "/v1/models",
                                     serving_container_predict_route = "/v1/models/predict",
                                     staging_bucket                  = staging_bucket)
 
-    model.wait()
+    model.wait() #esperamos que se cargue el modelo
     
     import time
     time.sleep(300)
@@ -283,7 +283,7 @@ def upload_to_model_registry(project                     : str,
     
     
 ######################################################################################### 
-#========================== deploy_model_endpoint COMPONENT ============================#
+#========================== deploy_model_endpoint COMPONENT ============================# Esto en en caso se haga de manera ONLINE es decir con endopoint y no mediante BATCH
 ######################################################################################### 
 @component(base_image="python:3.9",
            packages_to_install=["google-cloud-aiplatform==1.51.0", 
@@ -316,7 +316,7 @@ def deploy_model_endpoint(project         : str,
                     location    = location, 
                     credentials = credentials)
     
-    # Request if exist a endpoint
+    # Request if exist a endpoint # se obtiene el nombre del enpoint si es que antes se hizo una implementacion y se quiere utilizar el mismo endpoint
     def get_endpoint_by_display_name(display_name: str):
         endpoints = aiplatform.Endpoint.list() # List all available endpoints
         # Filter the endpoints by the given display_name
@@ -333,7 +333,7 @@ def deploy_model_endpoint(project         : str,
                                               labels       = labels)
     
     # Get the model
-    model= aiplatform.Model(model_name=model_id)
+    model= aiplatform.Model(model_name=model_id) # obtenemos el nombre del modelo
     
     # Deploy the model in a endpoint
     deploy=model.deploy(endpoint=endpoint,
@@ -343,8 +343,8 @@ def deploy_model_endpoint(project         : str,
     
     return str(endpoint.name)
     
-###################################################################################
-#================================ train PIPELINE =================================#
+################################################################################### Todo lo que contiene lineas arriba son los componentes ("@component") del pipeline
+#================================ train PIPELINE =================================# Todo lo que contiene lineas abajo es la orquestacion del pipeline
 ###################################################################################
 @pipeline(name = config["PIPELINE_METADATA"]["key"]+"-"+config["PIPELINE_METADATA"]["value"])
 def train_pipeline(project           : str,
@@ -363,8 +363,8 @@ def train_pipeline(project           : str,
             .set_cpu_limit('1')\
             .set_memory_limit('4G')\
             .set_display_name('Get Data')
-
-        split_data_op = split_data(data_input = get_data_op.outputs['dataset'])\
+# los '.ouputs' son los enlaces entre componentes. #en la linea 367 el input de 'split_data_op' es el output del componen anterior 'get_data_op' # Con esto se orquesta el pipeline
+        split_data_op = split_data(data_input = get_data_op.outputs['dataset'])\ 
         .set_cpu_limit('1')\
         .set_memory_limit('4G')\
         .set_display_name('Split Data')
@@ -382,8 +382,8 @@ def train_pipeline(project           : str,
         .set_memory_limit('4G')\
         .set_display_name('Testing Model')
 
-        with Condition(testing_model_op.outputs["Output"] > 0.96, name='model-upload-condition'):
-            custom_predict_op = create_custom_predict(project     = project,
+        with Condition(testing_model_op.outputs["Output"] > 0.96, name='model-upload-condition'): # si el output de "testing_model_op.outputs["Output"]" es mayor que 0.96 recien se ejecutaran las sentecias de abajo y si no no se ejecuta y ahi termina el pipeline
+            custom_predict_op = create_custom_predict(project     = project, # La funcion 'create_custom_predict' se explica en la linea 179
                                                       location    = location,
                                                       name_bucket = name_bucket,
                                                       labels      = labels)\
@@ -403,7 +403,7 @@ def train_pipeline(project           : str,
             .set_cpu_limit('1')\
             .set_memory_limit('4G')\
             .set_display_name('Save Model')
-
+# Si es un 'BATCH' prediction no deberia haber un 'enpoint' implementado, en cambio de si es 'ONLINE' ahi se deberiamos descomentar de la linea 407 a la 421
             # deploy_model_endpoint_op = deploy_model_endpoint(project         = project,
             #                                              location        = location,
             #                                              model_name      = model_name,
@@ -421,7 +421,7 @@ def train_pipeline(project           : str,
 def compile_pipeline(path_bucket       : str = PATH_BUCKET, 
                      name_bucket       : str = NAME_BUCKET, 
                      compile_name_file : str = COMPILE_NAME_FILE) -> str:
-    
+    # la funcion crea un archivo .yml
     compiler.Compiler().compile(pipeline_func = train_pipeline,
                                 package_path  = compile_name_file)
     # Initialize credentials
@@ -435,7 +435,7 @@ def compile_pipeline(path_bucket       : str = PATH_BUCKET,
     
     return f"-- OK: COMPILE -- | PATH: {path_bucket+'/'+compile_name_file}"
 
-def run_pipeline(project           : str = PROJECT,
+def run_pipeline(project           : str = PROJECT, # Los parametros se estan leyendo desde el archivo de la fila nro 18 que es 'config.json'. Las variables que se crearon ahi se traen a esta funcion
                  location          : str = REGION,
                  labels            : Dict = LABELS,
                  model_name        : str = MODEL_NAME,
@@ -444,7 +444,7 @@ def run_pipeline(project           : str = PROJECT,
                  name_bucket       : str = NAME_BUCKET, 
                  compile_name_file : str = COMPILE_NAME_FILE,
                  display_name      : str = DISPLAY_NAME) -> str:
-    
+    # La funcion ejecuta o levanta el pipeline en si
     ### Parameters for pipeline job
     pipeline_parameters = dict(project           = project,
                                location          = location,
@@ -453,7 +453,7 @@ def run_pipeline(project           : str = PROJECT,
                                labels            = labels,
                                model_name        = model_name,
                                model_description = model_description)
-    
+    # Para inicializar el pipeline GCP pide los parametros que se estan colocando aqui abajo
     start_pipeline = aiplatform.PipelineJob(display_name     = list(labels.values())[0],
                                             template_path    = 'gs://'+name_bucket+'/'+path_bucket+'/'+compile_name_file,
                                             pipeline_root    = 'gs://'+name_bucket+'/'+path_bucket,
@@ -463,6 +463,6 @@ def run_pipeline(project           : str = PROJECT,
                                             location         = location,
                                             parameter_values = pipeline_parameters)
     
-    start_pipeline.submit()
-    
+    start_pipeline.submit() #ejecucion del pipeline en VERTEXAI
+    # ¿a que pipeline se refiere? rpta: al que esta en la linea 347
     return '-- OK RUN --'

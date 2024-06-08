@@ -28,7 +28,7 @@ def preprocess_data(train_df):
     # Replacing the new values
     train_df[X_train.columns] = X_train_scaled
 
-    return train_df, scaler
+    return train_df, scaler #Es necesario guardar el objeto scaler para aplicar la misma transformación a los datos de prueba y a cualquier nuevo dato que pueda necesitar la misma estandarización en el futuro
 
 def scaler_data(scaler, test_df):
     # Separating the features and target

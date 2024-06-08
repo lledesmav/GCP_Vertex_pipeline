@@ -81,7 +81,7 @@ def get_data(name_bucket : str,
     random_sample = data.sample(n=min(100, len(data)), random_state=42) # The random_state ensures reproducibility
     data = random_sample.drop(columns=['target'])
     
-    #==== Get the training_dataset ====#
+    #==== Get the training_dataset ====# Aca leemos el dataset de entrenamiento que esta en 'train_data_path'. Este se guardo en 'train_pipeline.py' linea 107 y lo volvemos a usar para la comparacion de distribucion entre base de datos.
     from CustomLib.gcp import cloudstorage
     gcs_path = f"gs://{name_bucket}/{path_bucket}/last_training_path.txt"
     train_data_path = cloudstorage.read_txt_as_str(gcs_path=gcs_path)
@@ -94,7 +94,7 @@ def get_data(name_bucket : str,
     
     
 ###################################################################################
-#============================ batch_predict COMPONENT ============================#
+#============================ batch_predict COMPONENT ============================# Este es el componente mas complejo
 ###################################################################################
 @component(base_image = BASE_IMAGE)
 def batch_predict(project           : str,
@@ -113,17 +113,17 @@ def batch_predict(project           : str,
                   output_bq_table   : str,
                   data_output       : OutputPath("Dataset")) -> NamedTuple("output", [("job_name", str)]):
     
-    #==== Read input data from GCS ====#
+    #==== Read input data from GCS ====# base de datos que se quiere predecir
     from CustomLib.gcp import cloudstorage, bigquery
     df = cloudstorage.read_csv_as_df(gcs_path = data_input + '.csv')
     
-    #==== Get the model ====#
+    #==== Get the model ====# modelo que se llama de model registry, se le da la forma de como esta almacenado el modelo
     from pipeline.prod_modules import get_model_by_display_name
     model = get_model_by_display_name(display_name = model_name, 
                                       project      = project, 
                                       location     = location)
     
-    #==== Generate batch predictions ====#
+    #==== Generate batch predictions ====# Aqui se hace todo el trabajo con el archivo 'prod_modules.py' linea 87, que basicamente hace la prediccion por lotes y el monitoreo y el cual se tiene las graficas y seteo de threahold
     from pipeline.prod_modules import last_slash_detec, batch_prediction_request
     df_to_predict, job_name = batch_prediction_request(project           = project,
                                                        location          = location,
@@ -155,7 +155,7 @@ def batch_predict(project           : str,
 
     
 ################################################################################
-#============================ save_stats COMPONENT ============================#
+#============================ save_stats COMPONENT ============================# Estos estadisticos de distribucion los mueve de una ruta a otra
 ################################################################################
 @component(base_image = BASE_IMAGE)
 def save_stats(name_bucket      : str,

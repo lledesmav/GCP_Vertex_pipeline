@@ -83,7 +83,7 @@ def last_slash_detec(path : str):
     else:
         path_final = path
     return path_final
-
+# Toda esta funcion esta parametrizada, es importante entender como funciona por detras, se debe tener como plantilla
 def batch_prediction_request(project           = str,
                              location          = str,
                              model_name        = str,
@@ -108,10 +108,10 @@ def batch_prediction_request(project           = str,
     attribution_score_drift_thresholds  = prod_config["BATCH_PREDICTION"]['ATTRIBUTION_SCORE_DRIFT_THRESHOLDS']
     ALERT_MAILS                         = prod_config["BATCH_PREDICTION"]["ALERT_MAILS"]
     
-    df_to_predict.to_json(input_path+'/input_batch_model'+'.jsonl', orient='records', lines=True)   #REVISAR SI ES NECESARIO PERMISOS
+    df_to_predict.to_json(input_path+'/input_batch_model'+'.jsonl', orient='records', lines=True)   #REVISAR SI ES NECESARIO PERMISOS, aca es base de datos que se entreno el modelo
     INPUT_URI = (input_path + '/input_batch_model' + '.jsonl').replace('/gcs/', 'gs://')
     OUTPUT_URI = (output_path+'/predictions').replace('/gcs/', 'gs://')
-    training_dataset = training_dataset.replace('/gcs/', 'gs://')
+    training_dataset = training_dataset.replace('/gcs/', 'gs://') # base de datos que se quiere predecir
     
     from google.cloud.aiplatform_v1beta1 import (BatchPredictionJob, GcsSource, GcsDestination, MachineSpec, ModelMonitoringConfig, ModelMonitoringObjectiveConfig, SamplingStrategy, ThresholdConfig, ModelMonitoringAlertConfig, BatchDedicatedResources)
     from google.cloud import aiplatform
@@ -123,7 +123,7 @@ def batch_prediction_request(project           = str,
     TRAINING_FORMAT   = 'csv'
     STRATEGY          = SamplingStrategy.RandomSampleConfig(sample_rate=SAMPLE_RATE)
     
-    # Create the variables
+    # Create the variables # Se define parametros y/o funciones propias del Python SDK de GCP. Este codigo tambien es reutilizable
     SKEW_THRESHOLDS                    = {feature: ThresholdConfig(value=skew_thresholds[feature]) \
                                           for feature in features}
     ATTRIBUTION_SCORE_SKEW_THRESHOLDS  = {feature: ThresholdConfig(value=attribution_score_skew_thresholds[feature]) \
@@ -151,7 +151,7 @@ def batch_prediction_request(project           = str,
                                                                 attribution_score_drift_thresholds = ATTRIBUTION_SCORE_DRIFT_THRESHOLDS))],
                             alert_config = ALERT_CONFIG,
                             stats_anomalies_base_directory = GcsDestination(output_uri_prefix = STATS_ANOMALIES_URI))
-    
+    # Aqui es donde se ejcuta la prediccion tipo BATCH
     BATCH_PREDICTION_JOB = BatchPredictionJob(
                         display_name            = DISPLAY_NAME,
                         model                   = MODEL.versioned_resource_name,
@@ -174,7 +174,7 @@ def batch_prediction_request(project           = str,
     job = client.create_batch_prediction_job(parent               = f"projects/{project}/locations/{location}",
                                              batch_prediction_job = BATCH_PREDICTION_JOB,
                                              timeout              = 3600)
-    
+    # Con esta sentencia se va a esperar que termine de ejecutarse el JOB
     from google.cloud.aiplatform_v1beta1 import GetBatchPredictionJobRequest
     request  = GetBatchPredictionJobRequest(name = job.name)
     response = client.get_batch_prediction_job(request = request, 
@@ -189,7 +189,7 @@ def batch_prediction_request(project           = str,
         if response.state.real == 4:
             pass
     
-    #===== Review all the results predictions "prediction.results-0000x-of-0000y" =====#
+    #===== Review all the results predictions "prediction.results-0000x-of-0000y" =====# lee las predicciones y las devuelve
     import pandas as pd
     import os
     from CustomLib.gcp import cloudstorage
@@ -215,7 +215,7 @@ def batch_prediction_request(project           = str,
     df_to_predict[target] = list(result['prediction'])
     job_name = str(job.name.split('/')[-1])
     
-    return df_to_predict, job_name
+    return df_to_predict, job_name # aqui esta el Dataframe con las predicciones y el job_name solo por tema de seguimiento
 
 
 def move_stats_file(job_name   : str, 

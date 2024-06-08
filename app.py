@@ -5,12 +5,12 @@ app = Flask(__name__)
 def main():
     return 'Modelo de ejemplo MLOps'
 
-@app.route("/train_pipeline")
+@app.route("/train_pipeline") #esta ruta activa el pipeline de entrenamiento
 def train_pipeline():
-    from pipeline.train_pipeline import compile_pipeline, run_pipeline
+    from pipeline.train_pipeline import compile_pipeline, run_pipeline # llama a la carpeta "pipeline" y de ahi extrae el achivo "train_pipeline.py" y de ahi importa las dos funciones mencionadas que estan en el script 'train_pipeline.py'
     compile_pipeline()
     run_pipeline()
-    return 'Ejecución Correcta!'
+    return 'Ejecución Correcta!' # Esto ejecuta el pipeline en VertexAI
 
 @app.route("/predict_pipeline")
 def predict_pipeline():
