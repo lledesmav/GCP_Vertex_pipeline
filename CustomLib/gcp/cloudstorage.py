@@ -18,11 +18,11 @@ def split_gcs_path(gcs_path:str) -> Tuple[str, str]:
     """
     from urllib.parse import urlsplit
     # Split the URL components
-    url_parts = urlsplit(gcs_path.replace('/gcs/','gs://')) #Replace some inconsistency
+    url_parts = urlsplit(gcs_path.replace('/gcs/','gs://')) #Replace some inconsistency, Reemplaza /gcs/ con gs:// en la ruta proporcionada para manejar inconsistencias en el formato.
     # Extract the bucket name
-    bucket_name = url_parts.netloc
+    bucket_name = url_parts.netloc # de los componentes de la URL representa la ubicación de la red (dominio o bucket en este caso).
     # Extract the blob_name (excluding the leading '/')
-    blob_name = url_parts.path[1:]
+    blob_name = url_parts.path[1:] # de los componentes de la URL quitando el primer carácter (/) para obtener solo el nombre del blob.
     
     return bucket_name, blob_name
         

@@ -39,9 +39,9 @@ BASE_IMAGE                = '{}-docker.pkg.dev/{}/{}/{}:'.format(REGION, # Esta 
 ##############################################################################################
 #===================================== get_data COMPONENT ===================================#
 ##############################################################################################
-@component(base_image = BASE_IMAGE) # Este componente en si tiene una imagen base, ya que cada una de las componentes se ejecuta dentro de un contenedor. 'BASE_IMAGE' se define en la ruta que inidica la linea 33
-def get_data(dataset : OutputPath("Dataset")): # El parametro OutputPath es especifica porque vienen de la linea 1 que son parametros que vienen de la libreria kubeflow. Lo cual quiere decir que OutputPath es una ruta que le pondra nombre de 'Dataset'
-    
+@component(base_image = BASE_IMAGE) # Cada componente se ejecuta dentro de un contenedor. Este componente en si tiene una imagen base, ya que cada una de las componentes se ejecuta dentro de un contenedor. 'BASE_IMAGE' se define en la ruta que inidica la linea 33
+def get_data(dataset : OutputPath("Dataset")): # El parametro OutputPath es especifica porque vienen de la linea 1 que son parametros que vienen de la libreria kubeflow. Lo cual quiere decir que OutputPath es una ruta que le pondra nombre de 'Dataset'. Tener en cuenta que se usan los parametros de Kubeflow
+    #OutputPath: Utilizado para especificar que el argumento dataset es una ruta de salida. 
     #==== Importing necessary libraries ====# Lo que contiene aqui y lineas abajo es lo mismo que el archivo "0. Flow Test.ipynb" que es trabajo por el DataScientis, lo cual simplemente se copia y pega aqui.
     import pandas as pd
     from sklearn.datasets import load_iris
@@ -62,7 +62,7 @@ def get_data(dataset : OutputPath("Dataset")): # El parametro OutputPath es espe
     # Rename the columns using the mapping
     data.rename(columns=column_mapping, inplace=True)
     
-    #==== Save the df in GCS ====#
+    #==== Save the df in GCS ====# Guardar DataFrame en Google Cloud Storage
     from CustomLib.gcp import cloudstorage # esta es una libreria personalizada que esta en la carpeta 'CustomLib'. Aqui hay funciones personalizadas para el uso de los diferentes servicios dentro de GCP principalmente bigquery, cloudbuild, , cloudrun, cloustorae 
     cloudstorage.write_csv(df       = data, # se esta escribiendo un csv dentro de un cloudstorage. Esto lo puedes revisar en el archivo cloudstorage.py linea 29 de la carpeta "Customlib.gcp"
                            gcs_path = dataset + '.csv') # se guarda la basededatos en la ruta 'dataset' que se definio arriba
