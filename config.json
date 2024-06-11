@@ -8,7 +8,7 @@
     "PIPELINE_PATH_BUCKET"         : "mlops-test",
     "PIPELINE_MODEL_NAMES"         : "iris-model",
     "PIPELINE_MODEL_DESCRIPTION"   : "Modelo plantilla MLOps",
-    "PIPELINE_ALERT_MAILS"         : ["lucianoledesmav@gmail.com"],
+    "PIPELINE_ALERT_MAILS"         : ["luisledesmav88@gmail.com"],
     
     "OUTPUT_PROJECT_ID"            : "core-song-419302",
     "OUTPUT_DATASET_ID"            : "MlopsTemplate",
