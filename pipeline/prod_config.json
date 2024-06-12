@@ -1,10 +1,10 @@
-// Aca se define todo lo necesario para la prediccion tipo BATCH
+
 {
     "BATCH_PREDICTION":{
-        "DEPLOY_COMPUTE":"n1-standard-8", // tipo de maquina virtual que va hacer uso para este tipo de batch
+        "DEPLOY_COMPUTE":"n1-standard-8", 
         "START_REPLICA":5,
         "MAX_REPLICA":5,
-        "SAMPLE_RATE":0.8, // de lo que quiero predecir solo tomara el 80% (no se una el 100% por temas de procesamiento)
+        "SAMPLE_RATE":0.8, 
         
         "SKEW_THRESHOLDS":{"sepal_length_cm" : 0.3, 
                            "sepal_width_cm"  : 0.3,
@@ -26,6 +26,6 @@
                                               "petal_length_cm" : 0.3, 
                                               "petal_width_cm"  : 0.3},
         
-        "ALERT_MAILS":["enriquemejiagamarra@gmail.com"]
+        "ALERT_MAILS":["luisledesmav88@gmail.com"]
     }
 }
