@@ -58,6 +58,6 @@ steps:
 substitutions:
   _PROJECT_ID: 'my-first-project-mle'
   _REGION: 'us-central1'
-  _REPOSITORY_NAME: 'repo-mle-template'
+  _REPOSITORY_NAME: 'mle-template'
   _IMAGE_NAME: 'mle-template'
   _CLOUD_RUN_SERVICE: 'mle-template-service'
