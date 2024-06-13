@@ -1,16 +1,16 @@
 {
-    "PIPELINE_PROJECT_ID"          : "core-song-419302",
+    "PIPELINE_PROJECT_ID"          : "my-first-project-mle",
     "PIPELINE_REGION"              : "us-central1",
     "PIPELINE_METADATA"            : {"key":"mlops",
                                       "value":"mle-template"},
     "PIPELINE_CRON"                : "TZ=America/Lima 30 11 3 * *",
-    "PIPELINE_NAME_BUCKET"         : "my-bucket-dmc2",
+    "PIPELINE_NAME_BUCKET"         : "my-bucket-dmc3",
     "PIPELINE_PATH_BUCKET"         : "mlops-test",
     "PIPELINE_MODEL_NAMES"         : "iris-model",
     "PIPELINE_MODEL_DESCRIPTION"   : "Modelo plantilla MLOps",
     "PIPELINE_ALERT_MAILS"         : ["lucianoledesmav@gmail.com"],
     
-    "OUTPUT_PROJECT_ID"            : "core-song-419302",
+    "OUTPUT_PROJECT_ID"            : "my-first-project-mle",
     "OUTPUT_DATASET_ID"            : "MlopsTemplate",
     "OUTPUT_TABLE_ID"              : "Predictions",
     
