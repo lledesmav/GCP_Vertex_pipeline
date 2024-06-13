@@ -364,7 +364,7 @@ def train_pipeline(project           : str,
             .set_memory_limit('4G')\
             .set_display_name('Get Data')
 # los '.ouputs' son los enlaces entre componentes. #en la linea 367 el input de 'split_data_op' es el output del componen anterior 'get_data_op' # Con esto se orquesta el pipeline
-        split_data_op = split_data(data_input = get_data_op.outputs['dataset'])\ 
+        split_data_op = split_data(data_input = get_data_op.outputs['dataset'])\
         .set_cpu_limit('1')\
         .set_memory_limit('4G')\
         .set_display_name('Split Data')
