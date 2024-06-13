@@ -30,10 +30,10 @@ TIMESTAMP         = datetime.now().strftime("%Y%m%d%H%M%S")
 DISPLAY_NAME      = config["PIPELINE_METADATA"]["key"]+"-"+config["PIPELINE_METADATA"]["value"]+'-train-{}'.format(TIMESTAMP)
 
 BASE_CONTAINER_IMAGE_NAME = config["PIPELINE_METADATA"]["value"]
-BASE_IMAGE                = '{}-docker.pkg.dev/{}/{}/{}:'.format(REGION, # Esta imagen almacena todo (archivos) los que esta dentro de la carpeta GCP_Vertex_pipeline
+BASE_IMAGE                = '{}-docker.pkg.dev/{}/{}/{}:latest'.format(REGION, # Esta imagen almacena todo (archivos) los que esta dentro de la carpeta GCP_Vertex_pipeline
                                                                  PROJECT, 
                                                                  'repo-'+BASE_CONTAINER_IMAGE_NAME, 
-                                                                 BASE_CONTAINER_IMAGE_NAME)+'latest'
+                                                                 BASE_CONTAINER_IMAGE_NAME)#+'latest'
 
 
 ##############################################################################################
