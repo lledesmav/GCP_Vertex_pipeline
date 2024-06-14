@@ -56,7 +56,7 @@ steps:
         curl "$(gcloud run services describe mle-template-service --region=us-central1 --platform=managed --format='value(status.url)')/predict_pipeline"
 
 substitutions:
-  _PROJECT_ID: 'my-first-project-mle'
+  _PROJECT_ID: 'project-mle-426418'
   _REGION: 'us-central1'
   _REPOSITORY_NAME: 'repo-mle-template'
   _IMAGE_NAME: 'mle-template'
