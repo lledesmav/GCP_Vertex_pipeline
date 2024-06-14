@@ -1,5 +1,5 @@
 {
-    "PIPELINE_PROJECT_ID"          : "my-first-project-mle",
+    "PIPELINE_PROJECT_ID"          : "project-mle-426418",
     "PIPELINE_REGION"              : "us-central1",
     "PIPELINE_METADATA"            : {"key":"mlops",
                                       "value":"mle-template"},
@@ -8,9 +8,9 @@
     "PIPELINE_PATH_BUCKET"         : "mlops-test",
     "PIPELINE_MODEL_NAMES"         : "iris-model",
     "PIPELINE_MODEL_DESCRIPTION"   : "Modelo plantilla MLOps",
-    "PIPELINE_ALERT_MAILS"         : ["lucianoledesmav@gmail.com"],
+    "PIPELINE_ALERT_MAILS"         : ["luisledesmav88@gmail.com"],
     
-    "OUTPUT_PROJECT_ID"            : "my-first-project-mle",
+    "OUTPUT_PROJECT_ID"            : "project-mle-426418",
     "OUTPUT_DATASET_ID"            : "MlopsTemplate",
     "OUTPUT_TABLE_ID"              : "Predictions",
     
